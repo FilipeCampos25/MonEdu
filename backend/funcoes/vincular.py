@@ -39,7 +39,7 @@ def vinc(email):
         
         cursor.execute('''INSERT INTO progresso (id_usuario, id_licao, status_progresso, pontos_ganhos) 
                          VALUES (%s, %s, %s, %s)''', 
-                      (usuario_id, 0, " ", 0))
+                      (usuario_id, 1, "iniciado", 0))
         
         conn.commit()
         return "Registro inserido com sucesso"

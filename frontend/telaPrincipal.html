@@ -12,8 +12,8 @@
             <img src="/static/img/mascote.webp" alt="Mascote monedo" class="mascote">
         </div>
         <div class="user-info">
-            <h1 class="username">[User]</h1>
-            <span class="points">Pontos: <strong>0</strong></span>
+            <h1 class="username">{{ username }}</h1>
+            <span class="points">Pontos: <strong>{{ points }}</strong></span>
         </div>
         <nav class="header-nav">
             <button class="nav-button">Configuração</button>
@@ -25,24 +25,21 @@
             <div class="progress-bar">
                 <div class="progress-fill"></div>
             </div>
-            <section class="welcome-section" id="section-1">
-                <h2>Seção 1</h2>
-                <button class="action-button" onclick="toggleExercises('exercises-1')">Exercícios</button>
-                <div id="exercises-1" class="exercises-container">
-                    <div class="exercise-circle" onclick="startExercise(1, 1)">1</div>
-                    <div class="exercise-circle" onclick="startExercise(1, 2)">2</div>
-                    <div class="exercise-circle" onclick="startExercise(1, 3)">3</div>
-                </div>
-            </section>
-            <section class="welcome-section" id="section-2">
-                <h2>Seção 2</h2>
-                <button class="action-button" onclick="toggleExercises('exercises-2')">Exercícios</button>
-                <div id="exercises-2" class="exercises-container">
-                    <div class="exercise-circle" onclick="startExercise(2, 1)">1</div>
-                    <div class="exercise-circle" onclick="startExercise(2, 2)">2</div>
-                    <div class="exercise-circle" onclick="startExercise(2, 3)">3</div>
-                </div>
-            </section>
+            {% if secoes %}
+                {% for secao in secoes %}
+                <section class="welcome-section" id="section-{{ secao.id }}">
+                    <h2>{{ secao.nome }}</h2>
+                    <button class="action-button" onclick="toggleExercises('exercises-{{ secao.id }}')">Exercícios</button>
+                    <div id="exercises-{{ secao.id }}" class="exercises-container" style="display: none;">
+                        {% for subtopico in secao.subtopicos %}
+                        <div class="exercise-circle" data-id="{{ subtopico.id }}">{{ subtopico.numero }}</div>
+                        {% endfor %}
+                    </div>
+                </section>
+                {% endfor %}
+            {% else %}
+                <p>Nenhuma seção disponível no momento.</p>
+            {% endif %}
         </div>
 
         <div id="rank" class="tela">
