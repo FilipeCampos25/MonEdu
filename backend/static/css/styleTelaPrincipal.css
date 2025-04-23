@@ -1,4 +1,4 @@
-:root{
+:root {
     --preto: black;
     --branco: white;
     --azul: rgb(0, 87, 183);
@@ -7,6 +7,9 @@
     --laranja: rgb(245, 124, 0);
     --laranjaclaro: rgb(255, 119, 0);
     --laranjaforte: rgb(235, 74, 0);
+    --gold: #ffd700;
+    --silver: #d3d3d3;
+    --bronze: #cd7f32;
 }
 
 * {
@@ -75,7 +78,7 @@ main {
     justify-content: space-between;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
     z-index: 1000;
-    height: 100px; /* Definir uma altura fixa para o header */
+    height: 100px;
 }
 
 .logo-container {
@@ -314,4 +317,163 @@ main {
     background: linear-gradient(45deg, var(--laranjaforte), var(--laranja));
     color: var(--branco);
     transform: translateY(-2px);
+}
+
+/* Estilos para o ranking */
+.ranking-container {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(8px);
+    border-radius: 15px;
+    padding: 1.5rem;
+    margin: 0 auto;
+    max-width: 600px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    animation: fadeIn 0.5s ease forwards;
+}
+
+.ranking-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.8rem 1.2rem;
+    margin: 0.5rem 0;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.05);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    font-size: 1rem;
+    color: var(--branco);
+    opacity: 0;
+    animation: slideIn 0.3s ease forwards;
+    animation-delay: calc(0.1s * var(--rank-index));
+}
+
+.ranking-item:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+}
+
+.rank-gold {
+    background: linear-gradient(135deg, var(--gold), #e6b800);
+    color: var(--preto);
+    font-weight: 600;
+    border: 2px solid var(--gold);
+}
+
+.rank-silver {
+    background: linear-gradient(135deg, var(--silver), #a9a9a9);
+    color: var(--preto);
+    font-weight: 600;
+    border: 2px solid var(--silver);
+}
+
+.rank-bronze {
+    background: linear-gradient(135deg, var(--bronze), #a65e22);
+    color: var(--branco);
+    font-weight: 600;
+    border: 2px solid var(--bronze);
+}
+
+.rank-position {
+    font-weight: bold;
+    width: 50px;
+    text-align: center;
+}
+
+.rank-username {
+    flex-grow: 1;
+    padding-left: 10px;
+    font-weight: 500;
+}
+
+.rank-points {
+    font-weight: bold;
+    color: var(--laranjaclaro);
+}
+
+.rank-points::before {
+    content: '★ ';
+    color: var(--gold);
+}
+
+/* Estilos para o perfil */
+.profile-container {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(8px);
+    border-radius: 15px;
+    padding: 1.5rem;
+    margin: 0 auto;
+    max-width: 600px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    animation: fadeIn 0.5s ease forwards;
+}
+
+.profile-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.8rem 1.2rem;
+    margin: 0.5rem 0;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.05);
+    font-size: 1rem;
+    color: var(--branco);
+}
+
+.profile-label {
+    font-weight: bold;
+    color: var(--laranjaclaro);
+    width: 40%;
+}
+
+.profile-value {
+    flex-grow: 1;
+    text-align: right;
+    color: var(--branco);
+}
+
+/* Animação para entrada dos itens */
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+    .ranking-container, .profile-container {
+        padding: 1rem;
+        max-width: 100%;
+    }
+
+    .ranking-item, .profile-item {
+        font-size: 0.9rem;
+        padding: 0.6rem 1rem;
+    }
+
+    .rank-position {
+        width: 40px;
+    }
+
+    .profile-label {
+        width: 50%;
+    }
+}
+
+@media (max-width: 480px) {
+    .ranking-item, .profile-item {
+        flex-direction: column;
+        text-align: center;
+        gap: 0.5rem;
+    }
+
+    .rank-position, .rank-username, .rank-points,
+    .profile-label, .profile-value {
+        width: 100%;
+        padding: 0;
+        text-align: center;
+    }
 }

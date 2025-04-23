@@ -43,8 +43,10 @@
         </div>
 
         <div id="rank" class="tela">
-            <h1>Rank</h1>
-            <p>Aqui está o ranking dos usuários.</p>
+            <h1>Ranking dos Melhores</h1>
+            <div id="ranking-list" class="ranking-container">
+                <!-- Ranking será preenchido via JavaScript -->
+            </div>
         </div>
 
         <div id="simulador-de-investimento" class="tela">
@@ -59,7 +61,28 @@
 
         <div id="perfil" class="tela">
             <h1>Perfil</h1>
-            <p>Veja suas informações pessoais.</p>
+            <div class="profile-container">
+                {% if user_info %}
+                <div class="profile-item">
+                    <span class="profile-label">Nome:</span>
+                    <span class="profile-value">{{ user_info.nome }}</span>
+                </div>
+                <div class="profile-item">
+                    <span class="profile-label">Idade:</span>
+                    <span class="profile-value">{{ user_info.idade }}</span>
+                </div>
+                <div class="profile-item">
+                    <span class="profile-label">Email:</span>
+                    <span class="profile-value">{{ user_info.email }}</span>
+                </div>
+                <div class="profile-item">
+                    <span class="profile-label">Data de Criação:</span>
+                    <span class="profile-value">{{ user_info.data_criacao }}</span>
+                </div>
+                {% else %}
+                <p>Informações do usuário não disponíveis.</p>
+                {% endif %}
+            </div>
         </div>
     </main>
 

@@ -30,7 +30,7 @@ def main():
         print("\n=== Calculadora de Juros ===")
         calcular_juros()
 
-        # Pergunta se o usuário quer continuar
+        # Pergunta se o usuário quer continuar.
         continuar = input("\nDeseja fazer outro cálculo? (s/n): ").lower()
         if continuar != 's':
             print("Encerrando a calculadora...")

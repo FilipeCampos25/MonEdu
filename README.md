@@ -35,3 +35,19 @@ Sistema web simples com Flask para cadastro e login de usuários, integrado ao M
 
 ## Contribuição
 Abra issues ou pull requests para sugestões!
+
+## localizar main
+
+Linha 12: Configuração do Flask com secret key
+Linha 15: Configuração de logging (nível DEBUG)
+Linha 17: Configuração do banco de dados MySQL (host, user, senha, database, porta)
+Linha 27: Função get_db_connection para conectar ao banco MySQL
+Linha 37: Função hash_password para criptografar senhas com SHA-256
+Linha 44: Função init_db para criar tabelas do banco (usuarios, licao, perguntas, etc.)
+Linha 125: Rota principal (/) renderiza cadastro.html
+Linha 130: Rota /tela renderiza telaPrincipal.html com dados do usuário
+Linha 187: Rota /contentScreen.html renderiza contentScreen.html
+Linha 192: Rota /submit processa login e cadastro
+Linha 297: Rota /get_content/<subtopico_id> retorna conteúdos e perguntas (JSON)
+Linha 347: Rota /save_progress salva progresso e pontos do usuário
+Linha 384: Inicializa banco e roda aplicação Flask (debug, host, porta 5000)
