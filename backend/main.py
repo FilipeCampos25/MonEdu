@@ -172,7 +172,7 @@ def init_db():
 # Rota principal (página de cadastro/login)
 @cadastro.route("/")
 def index():
-    return render_template("cadastro.html")
+    return render_template("index.html")
 
 # Rota para a tela principal
 @cadastro.route("/tela")
