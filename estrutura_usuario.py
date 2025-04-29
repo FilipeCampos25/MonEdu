@@ -1,13 +1,16 @@
+from datetime import date, datetime
+
+
 class CarteiraVirtual:
     def __init__(self):
-        self.saldo = 0  # Saldo em moedas, que também representa os pontos
+        self.saldo: int = 0  # Saldo em moedas, que também representa os pontos
 
     def receita(self, quantidade):
         if quantidade < 0:
             return 'A quantidade ganha deve ser positiva.'
         else:
             self.saldo += quantidade
-            return f'Operação realizada com sucesso, foram depositados R$:{quantidade} ao seu saldo.'
+            return f'Operação realizada com sucesso, foram depositados {quantidade} moedas ao seu saldo.'
 
     def despesa(self, quantidade):
         if quantidade < 0:
@@ -16,10 +19,10 @@ class CarteiraVirtual:
             return 'Saldo insuficiente.'
         else:
             self.saldo -= quantidade
-            return f'Operação realizada com sucesso, foram retirados R$:{quantidade} do seu saldo.'
+            return f'Operação realizada com sucesso, foram retirados {quantidade} moedas do seu saldo.'
 
     def consultar_saldo(self):
-        return f'Saldo atual: R$:{self.saldo}.'
+        return f'Saldo atual: {self.saldo}.'
 
     @property
     def pontos(self):
@@ -56,68 +59,71 @@ class Progresso:
 
 
 class Usuario:
-    def __init__(self, id: int, nome, email, senha, data_nascimento):
-        self.__id = id
-        self.__nome = self.inserir_nome(nome)
-        self.__email = self.inserir_email(email)
-        self.__senha = self.definir_senha(senha)
-        self.__data_nascimento = self.validar_data_nascimento(data_nascimento)
+    def __init__(self, id: int, nome: str, email: str, senha: str, data_nascimento: date):
+        self.__id: int = id
+        self.__nome: str = nome
+        self.__email: str = email
+        self.__senha: str = senha
+        self.__data_nascimento: date = data_nascimento
         self.__carteira = CarteiraVirtual()
-        self.__progressos = []
-
-    def inserir_nome(self, nome):
-        if not nome or nome.strip() == '':
-            raise ValueError("Nome não pode estar vazio")
-        return nome.strip()
-
-    def inserir_email(self, email):
-        valid_domains = ['@gmail.com', '@hotmail.com', '@outlook.com']
-        if not email or email.strip() == '':
-            raise ValueError("Email não pode estar vazio")
-        if not any(domain in email for domain in valid_domains):
-            raise ValueError("Email inválido! Use @gmail, @hotmail ou @outlook")
-        return email.strip()
-
-    def definir_senha(self, senha):
-        if not senha or senha.strip() == '':
-            raise ValueError("Senha não pode estar vazia")
-        return senha.strip()
-
-    def validar_data_nascimento(self, data_nasc):
-        try:
-            from datetime import datetime
-            data = datetime.strptime(data_nasc, '%Y-%m-%d')
-            return data.strftime('%d/%m/%Y')
-        except ValueError:
-            raise ValueError("Data de nascimento inválida. Use o formato YYYY-MM-DD")
+        self.__progressos = {}
 
     @property
-    def id(self):
+    def id(self) -> int:
         return self.__id
 
     @property
-    def nome(self):
+    def nome(self) -> str:
         return self.__nome
 
-    @property
-    def email(self):
-        return self.__email
+    @nome.setter
+    def nome(self, nome: str) -> None:
+        if not nome.strip(): # verificar se o nome está em branco
+            raise ValueError('nome não pode estar vazio')
+        self.__nome = nome
 
     @property
-    def senha(self):
+    def email(self) -> str:
+        return self.__email
+    
+    @email.setter
+    def email(self, email: str) -> None:
+        valid_domains = ['@gmail.com', '@hotmail.com', '@outlook.com', '@yahoo.com']
+        if not email.strip():
+            raise ValueError("email não pode estar vazio")
+        if not any(email.endswith(domain) for domain in valid_domains):
+            raise ValueError("email inválido! Use um dominio, por exemplo: @gmail.com")
+        self.__email = email
+
+    @property
+    def senha(self) -> str:
         return self.__senha
+    
+    @senha.setter
+    def senha(self, senha: str) -> None:
+        if not senha or senha.strip() == '':
+            raise ValueError("senha não pode estar vazia")
+        self.__senha = senha
 
     @property
     def data_nascimento(self):
         return self.__data_nascimento
+    
+    @data_nascimento.setter
+    def data_nascimento(self, data_nasc: str) -> None:
+        try:
+            data = datetime.strptime(data_nasc, '%Y-%m-%d').date()
+            self.__data_nascimento = data
+        except ValueError:
+            raise ValueError("Data de nascimento inválida. Use o formato AAAA-MM-DD")
 
     def to_dict(self):
         return {
-            "id": self.__id,  # Incluído no dict
+            "id": self.__id,
             "nome": self.__nome,
             "email": self.__email,
             "senha": self.__senha,
-            "data_nascimento": self.__data_nascimento,
+            "data_nascimento": self.__data_nascimento.strftime('%Y-%m-%d'),  # Converte para string
             "progressos": [progresso.to_dict() for progresso in self.__progressos]
         }
 
@@ -125,7 +131,7 @@ class Usuario:
         print('\n')
         print(f"Nome: {self.__nome}")
         print(f"email: {self.__email}")
-        print(f"Data de Nascimento: {self.__data_nascimento}")
+        print(f"Data de Nascimento: {self.__data_nascimento.strftime('%d/%m/%Y')}")
         print(f"Saldo da Carteira: {self.__carteira.consultar_saldo()}")
         print(f"Pontuação Total: {self.__carteira.pontos}")
         print("Progressos:")
@@ -145,15 +151,15 @@ class Usuario:
     # Método para adicionar um progresso
     def adicionar_progresso(self, id_progresso: int, id_licao: int):
         progresso = Progresso(id_progresso, self.__id, id_licao)
-        self.__progressos.append(progresso)
+        self.__progressos[id_progresso] = progresso
         return progresso
 
     # Método para atualizar progresso e sincronizar pontos
     def atualizar_progresso(self, id_progresso: int, novo_status: str, pontos: int = 0):
-        for progresso in self.__progressos:
-            if progresso.id_progresso == id_progresso:
-                progresso.atualizar_status(novo_status, self.__carteira)
-                if pontos > 0:
-                    progresso.adicionar_pontos(pontos)
-                return progresso
-        raise ValueError("Progresso não encontrado")
+        progresso = self.__progressos.get(id_progresso)
+        if not progresso:
+            raise ValueError("Progresso não encontrado")
+        progresso.atualizar_status(novo_status, self.__carteira)
+        if pontos > 0:
+            progresso.adicionar_pontos(pontos)
+        return progresso
