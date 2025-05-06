@@ -65,18 +65,21 @@ function displayContent() {
 
     if (currentContentIndex < contents.length) {
         const content = contents[currentContentIndex];
+        // Escapar caracteres HTML para evitar XSS
         let textoFormatado = content.texto
             .replace(/&/g, '&amp;')
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;')
+            // Substituições de formatação
             .replace(/#([^#]+)#/g, '<h4>$1</h4>')
             .replace(/\*([^*]+)\*/g, '<strong>$1</strong>')
+            // Substituir quebras de linha por <br>
             .replace(/\n/g, '<br>');
 
         contentList.innerHTML = `
             <div class="content-item">
                 <h3>${content.numero || ''} - ${content.titulo || 'Sem título'}</h3>
-                <p>${textoFormatado}</p>
+                <div>${textoFormatado}</div>
             </div>
         `;
     } else if (perguntas.length > 0) {
