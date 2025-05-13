@@ -1,0 +1,7 @@
+as bibliotecas foram instaladas em um ambiente virtual separado ja que por algum motivo o vscode neste computador não estava aceitando.
+
+comando para acessar o ambiente virtual: source monedu_env/bin/activate
+    as bibliotecas "flask", "_mysql_conector" e "pandas" estão instalados nele.
+    deve ser usado sempre que for programar e executar algum código ao qual necessite de uma dessas bibliotecas
+
+comando para desativa-lo: deactivate
