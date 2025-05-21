@@ -1,0 +1,218 @@
+:root{
+    --preto: black;
+    --branco: white;
+    --azul: rgb(0, 87, 183);
+    --azulescuro: rgb(0, 0, 255);
+    --azulclaro: rgb(0, 81, 255);
+    --laranja: rgb(245, 124, 0);
+    --laranjaclaro: rgb(255, 119, 0);
+    --laranjaforte: rgb(235, 74, 0);
+}
+
+*{
+    margin: 0%;
+    border: 0%;
+    padding: 0%;
+}
+
+body {
+    margin: 0;
+    height: 100vh;
+    display: flex;
+    font-family:Arial, Helvetica, sans-serif;
+    background-color: black;
+    overflow-y: auto;
+}
+
+.log, .cad {
+    opacity: 0;
+    transform: translateY(50px);
+    transition: opacity 1.5s ease, transform 1.5s ease;
+}
+
+.revelado {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/*externo*/
+#login {
+    width: 50%;
+    background: linear-gradient(var(--azul), var(--azulescuro) );
+    transition: filter 0.3s ease;
+    padding: 20px;
+}
+
+#cadastro {
+    width: 50%;
+    background: linear-gradient(var(--laranjaclaro), var(--laranja) );
+    transition: filter 0.5s ease;
+    padding: 20px;
+}
+
+/*interno*/
+
+.login {
+    margin-bottom: 20px;
+    display: block;
+    text-align: center;
+    padding: auto;
+    color: var(--laranjaclaro);
+    border-radius: 10px;
+    padding-top: 30%;
+}
+
+.cadastro {
+    margin-bottom: 20px;
+    display: block;
+    text-align: center;
+    padding: auto;
+    color: var(--azul);
+    border-radius: 10px;
+    padding-top: 25%;
+}
+
+form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px; 
+    max-width: 300px; 
+    margin: auto;
+}
+
+#login input[type="text"],
+#login input[type="password"]{
+    font-family:Arial, Helvetica, sans-serif;
+    margin-bottom: 5px;
+    padding: 8px;
+    border-radius: 10px;
+    background-color: rgb(0, 2, 126, 0.2);
+    text-align: center;
+    color: var(--laranjaclaro) !important;
+    border: 2px solid var(--laranjaclaro);
+    font-weight: bold;
+    
+}
+
+#login input[type="submit"] {
+    margin-bottom: 5px;
+    border-radius: 10px;
+    background-color: rgb(0, 2, 126, 0.2);
+    padding: 8px;
+    cursor: pointer;
+    color: var(--laranjaclaro) !important;
+    border: 2px solid var(--laranjaclaro);
+    font-weight: bold;
+}
+
+/* Cadastro input fields */
+#cadastro input[type="text"],
+#cadastro input[type="password"],
+#cadastro input[type="email"],
+#cadastro input[type="date"] {
+    font-family:Arial, Helvetica, sans-serif;
+    margin-bottom: 5px;
+    padding: 8px;
+    border-radius: 10px;
+    background-color: rgb(90, 48, 0, 0.1);
+    text-align: center;
+    color: var(--azul) !important;
+    border: 2px solid var(--azul);
+    font-weight: bold;
+}
+
+#cadastro input[type="submit"] {
+    margin-bottom: 5px;
+    border-radius: 10px;
+    background-color: rgb(90, 48, 0, 0.1);
+    padding: 8px;
+    cursor: pointer;
+    color: var(--azul) !important;
+    border: 2px solid var(--azul);
+    font-weight: bold;
+}
+
+.buttonlog{
+    padding: 8px;
+    cursor: pointer;
+    text-align: center;
+    background: none;
+    border: none;
+    color: var(--laranjaclaro);
+    font-weight: bold;
+    font-size: 1em;
+}
+
+.buttoncad{
+    padding: 8px;
+    cursor: pointer;
+    text-align: center;
+    background: none;
+    border: none;
+    color: var(--azul);
+    font-weight: bold;
+    font-size: 1em;
+}
+
+/*tela principal*/
+
+#inicio {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(to bottom right, var(--azul), var(--azulescuro));
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000; /* Fica acima de tudo */
+    transition: transform 0.5s ease-in-out; /* Animação suave */
+}
+
+#ajuste{
+    display: flex;
+    flex-direction: column;
+    gap: 10px; 
+    max-width: 300px; 
+    margin: auto;
+}
+
+#fecharInicio {
+    font-family: Arial, Helvetica, sans-serif;
+    padding: 15px 30px;
+    font-size: 1em;
+    background: none;
+    border: 2px solid var(--laranjaclaro);
+    color: var(--laranja);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: 0.4s ease;
+}
+
+#inicio.hidden {
+    transform: translateY(-100%);
+}
+
+h1{
+    font-family: Arial, Helvetica, sans-serif;
+    padding: 10px;
+    text-align: center;
+    font-size: 3em;
+    color: var(--laranja);
+}
+
+
+h2{
+    font-family: Arial, Helvetica, sans-serif;
+    text-align: center;
+    font-size: 1.5em;
+    color: var(--laranja);
+}
+
+#fecharInicio:hover {
+    filter: brightness(1);
+    background: linear-gradient(to right, var(--laranjaforte), var(--laranjaclaro));
+    color: var(--azul);
+    border: none;
+}
