@@ -41,6 +41,12 @@ function showContentScreen(subtopicoId) {
             contents = data.conteudos || [];
             perguntas = data.perguntas || [];
             licaoId = data.licao_id;
+            if (!licaoId || isNaN(licaoId)) {
+                console.error('Erro: licao_id inválido recebido:', data.licao_id);
+                alert('Erro: ID da lição inválido. Por favor, tente novamente.');
+                return;
+            }
+            console.log('licaoId definido:', licaoId);
             if (contents.length === 0 && perguntas.length === 0) {
                 alert('Nenhum conteúdo ou perguntas disponíveis para este subtema.');
                 return;
@@ -151,6 +157,7 @@ function displayQuiz() {
 function saveAnswer(perguntaId, answer) {
     if (!quizSubmitted) {
         userAnswers[perguntaId] = answer;
+        console.log('Respostas do usuário:', userAnswers);
     }
 }
 
@@ -174,7 +181,16 @@ function submitQuiz() {
 }
 
 function finalizeQuiz() {
-    if (!quizSubmitted) return;
+    if (!quizSubmitted) {
+        console.log('Quiz não enviado. Não é possível finalizar.');
+        return;
+    }
+
+    if (!licaoId || isNaN(licaoId)) {
+        console.error('Erro: licaoId é inválido:', licaoId);
+        alert('Erro: ID da lição inválido. Por favor, tente novamente.');
+        return;
+    }
 
     let points = 0;
     perguntas.forEach(pergunta => {
@@ -182,6 +198,16 @@ function finalizeQuiz() {
             points += 10;
         }
     });
+
+    console.log('Calculando pontos:', { userAnswers, points });
+
+    if (isNaN(points)) {
+        console.error('Erro: Pontuação inválida:', points);
+        alert('Erro: Pontuação inválida. Por favor, tente novamente.');
+        return;
+    }
+
+    console.log('Enviando progresso:', { licao_id: licaoId, points: points });
 
     // Enviar pontos para o servidor
     fetch('/save_progress', {
@@ -195,6 +221,7 @@ function finalizeQuiz() {
         })
     })
         .then(response => {
+            console.log('Resposta do servidor:', response.status, response);
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
@@ -202,14 +229,15 @@ function finalizeQuiz() {
         })
         .then(data => {
             if (data.error) {
+                console.error('Erro do servidor:', data.error);
                 alert('Erro ao salvar progresso: ' + data.error);
             } else {
-                // Removido o alert de sucesso
+                console.log('Progresso salvo:', data);
                 window.location.href = data.redirect;
             }
         })
         .catch(error => {
-            console.error('Error saving progress:', error);
+            console.error('Erro ao salvar progresso:', error);
             alert('Erro ao salvar progresso: ' + error.message);
         });
 }

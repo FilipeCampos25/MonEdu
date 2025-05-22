@@ -476,6 +476,7 @@ def get_content(subtopico_id):
                 logging.error(f"Lição não encontrada para o subtema com ID {subtopico_id}")
                 return jsonify({"error": "Lição não encontrada para este subtema"}), 404
             licao_id = licao["licao_id"]
+            logging.debug(f"Lição encontrada: licao_id={licao_id}")
 
             query_content = text("""
                 SELECT numero, titulo, texto
@@ -499,12 +500,14 @@ def get_content(subtopico_id):
 
             if not df_content.empty:
                 conteudos = df_content.to_dict(orient="records")
+                logging.debug(f"Resposta enviada: conteudos={len(conteudos)}, perguntas={len(perguntas_list)}, licao_id={licao_id}")
                 return jsonify({
                     "conteudos": conteudos,
                     "perguntas": perguntas_list,
                     "licao_id": licao_id
                 })
             else:
+                logging.debug(f"Resposta enviada: error='Nenhum conteúdo encontrado', perguntas={len(perguntas_list)}, licao_id={licao_id}")
                 return jsonify({
                     "error": "Nenhum conteúdo encontrado para este subtema",
                     "perguntas": perguntas_list,
@@ -519,17 +522,45 @@ def get_content(subtopico_id):
 @cadastro.route("/save_progress", methods=["POST"])
 def save_progress():
     if "user_id" not in session:
+        logging.error("Tentativa de salvar progresso sem usuário autenticado")
         return jsonify({"error": "Usuário não autenticado"}), 401
 
     data = request.get_json()
+    logging.debug(f"Dados recebidos na requisição: {data}")
+    
+    if not data:
+        logging.error("Nenhum dado recebido na requisição")
+        return jsonify({"error": "Nenhum dado enviado"}), 400
+
     licao_id = data.get("licao_id")
     points = data.get("points")
 
-    if not licao_id or points is None:
-        return jsonify({"error": "Dados inválidos"}), 400
+    # Validação mais robusta
+    if licao_id is None or not isinstance(licao_id, int):
+        logging.error(f"Dados inválidos - licao_id: {licao_id}, points: {points}")
+        return jsonify({"error": f"Dados inválidos: licao_id={licao_id} deve ser um número inteiro"}), 400
+    
+    if points is None or not isinstance(points, (int, float)) or points < 0:
+        logging.error(f"Dados inválidos - licao_id: {licao_id}, points: {points}")
+        return jsonify({"error": f"Dados inválidos: points={points} deve ser um número não negativo"}), 400
+
+    # Usar o valor de points enviado pelo frontend como moedas_ganhas
+    moedas_ganhas = float(points)
 
     try:
         with engine.connect() as conn:
+            # Verificar se a lição existe
+            query = text("""
+                SELECT id_licao
+                FROM licao
+                WHERE id_licao = :id_licao
+            """)
+            result = conn.execute(query, {"id_licao": licao_id})
+            if not result.mappings().first():
+                logging.error(f"Lição não encontrada: id_licao={licao_id}")
+                return jsonify({"error": "Lição não encontrada"}), 404
+
+            # Verificar se o progresso já existe
             query = text("""
                 SELECT status_progresso
                 FROM progresso
@@ -542,43 +573,37 @@ def save_progress():
             existing_progress = result.mappings().first()
 
             if existing_progress and existing_progress["status_progresso"] == "concluido":
+                logging.info(f"Lição {licao_id} já concluída para usuário {session['user_id']}")
                 return jsonify({"error": "Lição já concluída"}), 400
 
-            query = text("""
-                SELECT pontos_recompensa
-                FROM licao
-                WHERE id_licao = :id_licao
-            """)
-            result = conn.execute(query, {"licao_id": licao_id})
-            recompensa = result.mappings().first()
-            if not recompensa:
-                return jsonify({"error": "Lição não encontrada"}), 404
-            moedas_ganhas = float(recompensa["pontos_recompensa"])
-
+            # Atualizar ou inserir progresso
             if existing_progress:
                 query = text("""
                     UPDATE progresso
-                    SET status_progresso = :status, data_criacao = :data_criacao
+                    SET status_progresso = :status, data_criacao = :data_criacao, pontos_ganhos = :pontos_ganhos
                     WHERE id_usuario = :id_usuario AND id_licao = :id_licao
                 """)
                 conn.execute(query, {
                     "status": "concluido",
                     "data_criacao": datetime.now(),
                     "id_usuario": session["user_id"],
-                    "id_licao": licao_id
+                    "id_licao": licao_id,
+                    "pontos_ganhos": moedas_ganhas
                 })
             else:
                 query = text("""
-                    INSERT INTO progresso (id_usuario, id_licao, status_progresso, data_criacao)
-                    VALUES (:id_usuario, :id_licao, :status, :data_criacao)
+                    INSERT INTO progresso (id_usuario, id_licao, status_progresso, data_criacao, pontos_ganhos)
+                    VALUES (:id_usuario, :id_licao, :status, :data_criacao, :pontos_ganhos)
                 """)
                 conn.execute(query, {
                     "id_usuario": session["user_id"],
                     "id_licao": licao_id,
                     "status": "concluido",
-                    "data_criacao": datetime.now()
+                    "data_criacao": datetime.now(),
+                    "pontos_ganhos": moedas_ganhas
                 })
 
+            # Atualizar moedas do usuário
             query = text("""
                 UPDATE usuarios
                 SET moedas = moedas + :moedas
@@ -589,6 +614,7 @@ def save_progress():
                 "id_usuario": session["user_id"]
             })
 
+            # Registrar transação
             query = text("""
                 INSERT INTO transacoes (id_usuario, valor, descricao, tipo_transacao, data_transacao)
                 VALUES (:id_usuario, :valor, :descricao, :tipo_transacao, :data_transacao)
@@ -601,6 +627,7 @@ def save_progress():
                 "data_transacao": datetime.now()
             })
 
+            # Atualizar ou inserir gamificação
             query = text("""
                 SELECT valor
                 FROM gamificacao
@@ -641,6 +668,7 @@ def save_progress():
                 })
 
             conn.commit()
+            logging.info(f"Progresso salvo com sucesso: licao_id={licao_id}, moedas_ganhas={moedas_ganhas}")
             return jsonify({
                 "message": "Progresso salvo com sucesso",
                 "points": moedas_ganhas,
@@ -648,7 +676,7 @@ def save_progress():
             })
     except Exception as e:
         logging.error(f"Erro ao salvar progresso: {e}")
-        return jsonify({"error": f"Erro ao salvar progresso: {e}"}), 500
+        return jsonify({"error": f"Erro ao salvar progresso: {str(e)}"}), 500
 
 # Rota para obter o ranking dos 10 melhores usuários
 @cadastro.route("/get_ranking", methods=["GET"])
@@ -942,7 +970,13 @@ def update_price():
             mode = cota_data["volatilidade"]
             ultima_atualizacao = cota_data["ultima_atualizacao"]
 
-            if datetime.now() - ultima_atualizacao > timedelta(minutes=2):
+            # Verificar se passou pelo menos 1 dia para atualizar o preço
+            current_time = datetime.now()
+            time_diff = current_time - ultima_atualizacao
+            days_passed = time_diff.total_seconds() / (60 * 60 * 24)  # Converter para dias
+
+            # Verificar se passou pelo menos 7 dias para atualizar a volatilidade
+            if days_passed >= 7:
                 modes = ['padrao', 'pico_valorizacao', 'pico_desvalorizacao']
                 mode = random.choice(modes)
                 query = text("""
@@ -952,50 +986,54 @@ def update_price():
                 """)
                 conn.execute(query, {
                     "volatilidade": mode,
-                    "ultima_atualizacao": datetime.now()
+                    "ultima_atualizacao": current_time
                 })
                 logging.debug(f"Modo atualizado para: {mode}")
 
-            variation = random.uniform(0.02, 0.05)
-            if mode == "pico_valorizacao" and random.random() <= 0.6:
-                variation = variation
-            elif mode == "pico_desvalorizacao" and random.random() <= 0.6:
-                variation = -variation
-            else:
-                variation = variation if random.random() > 0.5 else -variation
+            # Atualizar preço da cota apenas se passou pelo menos 1 dia
+            if days_passed >= 1:
+                variation = random.uniform(0.02, 0.05)
+                if mode == "pico_valorizacao" and random.random() <= 0.6:
+                    variation = variation
+                elif mode == "pico_desvalorizacao" and random.random() <= 0.6:
+                    variation = -variation
+                else:
+                    variation = variation if random.random() > 0.5 else -variation
 
-            open_price = last_price
-            close_price = last_price * (1 + variation)
-            high_price = max(open_price, close_price) * random.uniform(1.02, 1.05)
-            low_price = min(open_price, close_price) * random.uniform(0.95, 0.98)
-            close_price = round(close_price, 2)
-            high_price = round(high_price, 2)
-            low_price = round(low_price, 2)
+                open_price = last_price
+                close_price = last_price * (1 + variation)
+                high_price = max(open_price, close_price) * random.uniform(1.02, 1.05)
+                low_price = min(open_price, close_price) * random.uniform(0.95, 0.98)
+                close_price = round(close_price, 2)
+                high_price = round(high_price, 2)
+                low_price = round(low_price, 2)
 
-            query = text("""
-                UPDATE valor_cota_atual
-                SET valor_cota = :valor_cota, ultima_atualizacao = :ultima_atualizacao
-                WHERE id = (SELECT id FROM valor_cota_atual ORDER BY id DESC LIMIT 1)
-            """)
-            conn.execute(query, {
-                "valor_cota": close_price,
-                "ultima_atualizacao": datetime.now()
-            })
+                query = text("""
+                    UPDATE valor_cota_atual
+                    SET valor_cota = :valor_cota, ultima_atualizacao = :ultima_atualizacao
+                    WHERE id = (SELECT id FROM valor_cota_atual ORDER BY id DESC LIMIT 1)
+                """)
+                conn.execute(query, {
+                    "valor_cota": close_price,
+                    "ultima_atualizacao": current_time
+                })
 
-            query = text("""
-                INSERT INTO historico_valor_cota (open_price, high_price, low_price, close_price, data_registro)
-                VALUES (:open_price, :high_price, :low_price, :close_price, :data_registro)
-            """)
-            conn.execute(query, {
-                "open_price": open_price,
-                "high_price": high_price,
-                "low_price": low_price,
-                "close_price": close_price,
-                "data_registro": datetime.now()
-            })
+                query = text("""
+                    INSERT INTO historico_valor_cota (open_price, high_price, low_price, close_price, data_registro)
+                    VALUES (:open_price, :high_price, :low_price, :close_price, :data_registro)
+                """)
+                conn.execute(query, {
+                    "open_price": open_price,
+                    "high_price": high_price,
+                    "low_price": low_price,
+                    "close_price": close_price,
+                    "data_registro": current_time
+                })
+
+                logging.debug(f"Preço atualizado: open={open_price}, close={close_price}, high={high_price}, low={low_price}")
 
             conn.commit()
-            return jsonify({"message": "Preço atualizado"})
+            return jsonify({"message": "Preço verificado/atualizado"})
     except Exception as e:
         logging.error(f"Erro ao atualizar preço: {e}")
         return jsonify({"error": f"Erro ao atualizar preço: {e}"}), 500
