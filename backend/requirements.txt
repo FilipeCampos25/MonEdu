@@ -5,5 +5,3 @@ sqlalchemy
 pandas
 flask-cors
 gunicorn
-EmailMessage
-smtplib
