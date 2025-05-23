@@ -6,7 +6,7 @@ import hashlib
 import os
 import logging
 from dotenv import load_dotenv
-from funcoes import Email_sender, objeto, vincular
+from funcoes import Email_sender, objeto
 import random
 from decimal import Decimal
 
@@ -424,7 +424,6 @@ def submit():
                 session["username"] = username
 
                 try:
-                    vincular.vinc(email)
                     Email_sender.e_mail(email, username)
                 except Exception as e:
                     logging.error(f"Erro nas funções externas: {e}")
