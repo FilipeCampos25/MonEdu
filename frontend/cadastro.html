@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="static/css/styleCadastro.css">
+    <title>Monedu | Cadastro</title>
+</head>
+<body>
+    <!-- Tela de entrada -->
+    <div id="inicio">
+        <div id="ajuste">
+            <h2>Bem-vindo(a) ao</h2>
+            <h1>Monedu</h1>
+            <button id="fecharInicio" onclick="subirTelaInicio()">Começar</button>
+        </div>
+    </div>
+
+    <!-- Login -->
+    <div id="login">
+        <h1 class="login">Login</h1>
+        <form action="{{ url_for('submit') }}" method="POST">
+            <input type="text" name="username" placeholder="Usuário" required>
+            <input type="password" name="password" placeholder="Senha" required>
+            <input type="submit" value="Acessar">
+            <button class="buttonlog" type="button" onclick="Blurlogin()">Criar minha conta</button>
+        </form>
+    </div>
+
+    <!-- Cadastro -->
+    <div id="cadastro">
+        <h1 class="cadastro">Cadastro</h1>
+        <form action="{{ url_for('submit') }}" method="POST">
+            <input type="text" name="username" placeholder="Usuário" required>
+            <input type="email" name="email" placeholder="E-mail" required>
+            <input type="password" name="password" placeholder="Senha" required>
+            <input type="password" name="confirm_password" placeholder="Confirmar Senha" required>
+            <input type="date" name="birth_date" placeholder="Data de Nascimento" required>
+            <button class="buttoncad" type="button" onclick="Blurcadastro()">Entrar</button>
+        </form>
+    </div>
+
+    <script src="static/script/scriptCadastro.js"></script>
+</body>
+</html>

@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/static/css/contentScreen.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
+    <title>Conteúdo do Subtema</title>
+</head>
+<body>
+    <div id="content-screen" class="content-screen active">
+        <div class="content-header">
+            <h2>Conteúdo</h2>
+            <button class="close-button" onclick="window.location.href='/tela'">×</button>
+        </div>
+        <div id="content-list"></div>
+        <div id="quiz-section" style="display: none;">
+            <h3>Teste seus conhecimentos</h3>
+            <div id="quiz-questions"></div>
+            <button id="submit-quiz" onclick="submitQuiz()">Enviar Respostas</button>
+            <div id="quiz-result"></div>
+        </div>
+        <div class="navigation">
+            <button id="prev-button" onclick="navigateContent(-1)" disabled>Anterior</button>
+            <button id="next-button" disabled>Próximo</button>
+        </div>
+    </div>
+    <script src="/static/script/contentScreen.js"></script>
+</body>
+</html>
