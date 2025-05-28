@@ -7,10 +7,38 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.querySelectorAll('.exercise-circle').forEach(circle => {
         const subtopicoId = circle.getAttribute('data-id');
+        const isLocked = circle.classList.contains('locked');
+        
         circle.addEventListener('click', () => {
+            if (isLocked) {
+                console.warn(`Subtema ${subtopicoId} está bloqueado`);
+                alert('Este exercício está bloqueado. Conclua o exercício anterior primeiro.');
+                return;
+            }
+            
             if (subtopicoId) {
                 console.log(`Redirecting to contentScreen.html?subtopicoId=${subtopicoId}`);
-                window.location.href = `/contentScreen.html?subtopicoId=${subtopicoId}`;
+                fetch(`/get_content/${subtopicoId}`)
+                    .then(response => {
+                        if (!response.ok) {
+                            return response.json().then(data => {
+                                throw new Error(data.error || 'Erro ao acessar o subtema');
+                            });
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        if (data.error) {
+                            console.error('Erro ao carregar conteúdo:', data.error);
+                            alert(data.error);
+                        } else {
+                            window.location.href = `/contentScreen.html?subtopicoId=${subtopicoId}`;
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Erro ao verificar subtema:', error.message);
+                        alert(error.message);
+                    });
             } else {
                 console.error('No data-id found on clicked circle');
                 alert('Erro: Subtema inválido');

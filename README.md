@@ -1,3 +1,5 @@
+## Link do Render: https://monedu.onrender.com
+
 # Projeto PI - Sistema de Cadastro e Gamificação
 
 ## **Descrição**
@@ -114,21 +116,22 @@ Sistema web educacional desenvolvido com **Flask**, integrando funcionalidades d
 
 ## **Localizar Main**
 
-- **Linha 12**: Configuração do **Flask** com chave secreta.
+- **Linha 14**: Configuração do **Flask** com chave secreta.
 - **Linha 15**: Configuração de **logging** (nível **DEBUG**).
-- **Linha 18**: Configuração do banco de dados (**PostgreSQL** ou **SQLite**).
-- **Linha 37**: Função `hash_password` para criptografia de senhas.
-- **Linha 44**: Função `init_db` para criação das tabelas.
-- **Linha 159**: Rota principal (`/`) renderiza `cadastro.html`.
-- **Linha 164**: Rota `/tela` renderiza `telaPrincipal.html` com dados do usuário.
-- **Linha 224**: Rota `/contentScreen.html` renderiza tela de conteúdos.
-- **Linha 229**: Rota `/submit` processa login e cadastro.
-- **Linha 340**: Rota `/get_content/<subtopico_id>` retorna conteúdos e perguntas.
-- **Linha 389**: Rota `/save_progress` salva progresso e moedas.
-- **Linha 456**: Rota `/get_ranking` retorna ranking dos usuários.
-- **Linha 475**: Rota `/get_wallet_history` retorna histórico de transações.
-- **Linha 509**: Rotas do simulador de investimento (`/api/state`, `/api/trade`, etc.).
-- **Linha 672**: Inicialização do banco e execução do **Flask**.
+- **Linha 21**: Configuração do banco de dados (**PostgreSQL** ou **SQLite**).
+- **Linha 39**: Função `hash_password` para criptografia de senhas.
+- **Linha 46**: Função process_text para processar texto com marcações, substituindo \\n por quebras de linha.
+- **Linha 53**: Função `init_db` para criação das tabelas.
+- **Linha 165**: Rota principal (`/`) renderiza `cadastro.html`.
+- **Linha 170**: Rota `/tela` renderiza `telaPrincipal.html` com dados do usuário.
+- **Linha 229**: Rota `/contentScreen.html` renderiza tela de conteúdos.
+- **Linha 234**: Rota `/submit` processa login e cadastro.
+- **Linha 346**: Rota `/get_content/<subtopico_id>` retorna conteúdos e perguntas.
+- **Linha 457**: Rota `/save_progress` salva progresso e moedas.
+- **Linha 525**: Rota `/get_ranking` retorna ranking dos usuários.
+- **Linha 544**: Rota `/get_wallet_history` retorna histórico de transações.
+- **Linha 583**: Rotas do simulador de investimento (`/api/state`, `/api/trade`, etc.).
+- **Linha 779**: Inicialização do banco e execução do **Flask**.
 
 ## **Notas**
 

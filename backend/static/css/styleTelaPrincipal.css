@@ -12,6 +12,7 @@
     --bronze: #cd7f32;
     --verde: #00cc00;
     --vermelho: #ff3333;
+    --cinza: #666666; /* Cor para exercícios bloqueados */
 }
 
 * {
@@ -256,6 +257,7 @@ main {
     to { opacity: 1; transform: translateY(0); }
 }
 
+/* Estilo atualizado para os círculos de exercícios */
 .exercise-circle {
     width: 100px;
     height: 100px;
@@ -269,6 +271,7 @@ main {
     font-weight: 500;
     cursor: pointer;
     transition: transform 0.4s ease, box-shadow 0.3s ease;
+    position: relative;
 }
 
 .exercise-circle:hover {
@@ -280,6 +283,51 @@ main {
     background: linear-gradient(135deg, var(--verde), #009900);
     transform: scale(1.05);
     box-shadow: 0 0 15px rgba(0, 255, 0, 0.5);
+}
+
+.exercise-circle.completed::after {
+    content: '✔';
+    position: absolute;
+    top: -10px;
+    right: -10px;
+    width: 24px;
+    height: 24px;
+    background-color: var(--verde);
+    color: var(--branco);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    border: 2px solid var(--branco);
+}
+
+.exercise-circle.locked {
+    background: linear-gradient(135deg, var(--cinza), #4d4d4d);
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+.exercise-circle.locked::after {
+    content: '🔒';
+    position: absolute;
+    top: -10px;
+    right: -10px;
+    width: 24px;
+    height: 24px;
+    background-color: var(--cinza);
+    color: var(--branco);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    border: 2px solid var(--branco);
+}
+
+.exercise-circle.locked:hover {
+    transform: none;
+    box-shadow: none;
 }
 
 .footer-container {
@@ -755,6 +803,19 @@ main {
         flex-direction: column;
         gap: 1rem;
     }
+
+    .exercise-circle {
+        width: 90px;
+        height: 90px;
+        font-size: 1.3rem;
+    }
+
+    .exercise-circle.completed::after,
+    .exercise-circle.locked::after {
+        width: 20px;
+        height: 20px;
+        font-size: 0.9rem;
+    }
 }
 
 @media (max-width: 480px) {
@@ -776,6 +837,13 @@ main {
         width: 80px;
         height: 80px;
         font-size: 1.2rem;
+    }
+
+    .exercise-circle.completed::after,
+    .exercise-circle.locked::after {
+        width: 18px;
+        height: 18px;
+        font-size: 0.8rem;
     }
 
     .footer-link {

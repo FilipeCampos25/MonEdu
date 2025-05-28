@@ -246,27 +246,72 @@ def tela():
             }
             points = float(user_data["moedas"])
 
-            query = text("SELECT id, nome FROM topicos ORDER BY ordem")
+            query = text("SELECT id, nome, licao_id FROM topicos ORDER BY ordem")
             result = conn.execute(query)
             topicos = result.mappings().all()
 
             secoes = []
             for topico in topicos:
                 query = text("""
-                    SELECT id, numero, nome
-                    FROM subtopicos
-                    WHERE topico_id = :topico_id
-                    ORDER BY ordem
+                    SELECT s.id, s.numero, s.nome, s.ordem
+                    FROM subtopicos s
+                    WHERE s.topico_id = :topico_id
+                    ORDER BY s.ordem
                 """)
                 result = conn.execute(query, {"topico_id": topico["id"]})
                 subtopicos = result.mappings().all()
-                secoes.append(
-                    {
-                        "id": topico["id"],
-                        "nome": topico["nome"],
-                        "subtopicos": subtopicos,
-                    }
-                )
+
+                # Verificar o progresso de cada subtema
+                subtopicos_with_status = []
+                for index, subtopico in enumerate(subtopicos):
+                    # Obter a lição associada ao subtema
+                    query = text("""
+                        SELECT p.status_progresso
+                        FROM progresso p
+                        JOIN topicos t ON p.id_licao = t.licao_id
+                        JOIN subtopicos s ON s.topico_id = t.id
+                        WHERE s.id = :subtopico_id AND p.id_usuario = :user_id
+                    """)
+                    result = conn.execute(query, {
+                        "subtopico_id": subtopico["id"],
+                        "user_id": session["user_id"]
+                    })
+                    progress = result.mappings().first()
+                    status = progress["status_progresso"] if progress else "nao_iniciado"
+
+                    # Verificar se o subtema anterior foi concluído
+                    is_locked = False
+                    if index > 0:
+                        prev_subtopico = subtopicos[index - 1]
+                        query = text("""
+                            SELECT p.status_progresso
+                            FROM progresso p
+                            JOIN topicos t ON p.id_licao = t.licao_id
+                            JOIN subtopicos s ON s.topico_id = t.id
+                            WHERE s.id = :prev_subtopico_id AND p.id_usuario = :user_id
+                        """)
+                        result = conn.execute(query, {
+                            "prev_subtopico_id": prev_subtopico["id"],
+                            "user_id": session["user_id"]
+                        })
+                        prev_progress = result.mappings().first()
+                        is_locked = not prev_progress or prev_progress["status_progresso"] != "concluido"
+
+                    subtopicos_with_status.append({
+                        "id": subtopico["id"],
+                        "numero": subtopico["numero"],
+                        "nome": subtopico["nome"],
+                        "ordem": subtopico["ordem"],
+                        "status": status,
+                        "is_locked": is_locked
+                    })
+
+                secoes.append({
+                    "id": topico["id"],
+                    "nome": topico["nome"],
+                    "licao_id": topico["licao_id"],
+                    "subtopicos": subtopicos_with_status,
+                })
 
             return render_template(
                 "telaPrincipal.html", 
@@ -455,14 +500,21 @@ def submit():
 # Rota para obter conteúdos e perguntas de um subtema
 @cadastro.route("/get_content/<int:subtopico_id>")
 def get_content(subtopico_id):
+    if "user_id" not in session:
+        logging.error("Tentativa de acessar conteúdo sem usuário autenticado")
+        return jsonify({"error": "Usuário não autenticado"}), 401
+
     try:
         with engine.connect() as conn:
-            query = text("SELECT id FROM subtopicos WHERE id = :subtopico_id")
+            # Verificar se o subtema existe
+            query = text("SELECT id, topico_id, ordem FROM subtopicos WHERE id = :subtopico_id")
             result = conn.execute(query, {"subtopico_id": subtopico_id})
-            if not result.mappings().first():
+            subtopico = result.mappings().first()
+            if not subtopico:
                 logging.error(f"Subtema com ID {subtopico_id} não encontrado")
                 return jsonify({"error": "Subtema não encontrado"}), 404
 
+            # Obter a lição associada ao subtema
             query = text("""
                 SELECT t.licao_id
                 FROM subtopicos s
@@ -475,8 +527,39 @@ def get_content(subtopico_id):
                 logging.error(f"Lição não encontrada para o subtema com ID {subtopico_id}")
                 return jsonify({"error": "Lição não encontrada para este subtema"}), 404
             licao_id = licao["licao_id"]
-            logging.debug(f"Lição encontrada: licao_id={licao_id}")
 
+            # Verificar se o subtema anterior foi concluído
+            query = text("""
+                SELECT s.id
+                FROM subtopicos s
+                WHERE s.topico_id = :topico_id AND s.ordem < :ordem
+                ORDER BY s.ordem DESC
+                LIMIT 1
+            """)
+            result = conn.execute(query, {
+                "topico_id": subtopico["topico_id"],
+                "ordem": subtopico["ordem"]
+            })
+            prev_subtopico = result.mappings().first()
+
+            if prev_subtopico:
+                query = text("""
+                    SELECT p.status_progresso
+                    FROM progresso p
+                    JOIN topicos t ON p.id_licao = t.licao_id
+                    JOIN subtopicos s ON s.topico_id = t.id
+                    WHERE s.id = :prev_subtopico_id AND p.id_usuario = :user_id
+                """)
+                result = conn.execute(query, {
+                    "prev_subtopico_id": prev_subtopico["id"],
+                    "user_id": session["user_id"]
+                })
+                prev_progress = result.mappings().first()
+                if not prev_progress or prev_progress["status_progresso"] != "concluido":
+                    logging.info(f"Subtema {subtopico_id} bloqueado: subtema anterior não concluído")
+                    return jsonify({"error": "Subtema bloqueado. Conclua o subtema anterior primeiro."}), 403
+
+            # Obter conteúdos do subtema
             query_content = text("""
                 SELECT numero, titulo, texto
                 FROM conteudos
@@ -488,6 +571,7 @@ def get_content(subtopico_id):
             if not df_content.empty:
                 df_content['texto'] = df_content['texto'].apply(process_text)
 
+            # Obter perguntas da lição
             query = text("""
                 SELECT id_pergunta, enunciado, resposta_correta, opcoes
                 FROM perguntas
@@ -775,6 +859,7 @@ def get_state():
 
     try:
         with engine.connect() as conn:
+            # Obter o saldo de moedas do usuário
             query = text("""
                 SELECT moedas
                 FROM usuarios
@@ -783,6 +868,7 @@ def get_state():
             result = conn.execute(query, {"id_usuario": session["user_id"]})
             balance = float(result.mappings().first()["moedas"])
 
+            # Obter o total de cotas
             query = text("""
                 SELECT COALESCE(SUM(CASE WHEN tipo = 'compra' THEN quantidade ELSE -quantidade END), 0) AS total_cotas
                 FROM cotas_usuario
@@ -791,12 +877,14 @@ def get_state():
             result = conn.execute(query, {"id_usuario": session["user_id"]})
             shares = int(result.mappings().first()["total_cotas"])
 
+            # Obter o valor atual da cota
             query = text("SELECT valor_cota, volatilidade FROM valor_cota_atual ORDER BY id DESC LIMIT 1")
             result = conn.execute(query)
             cota_data = result.mappings().first()
             current_price = float(cota_data["valor_cota"])
             mode = cota_data["volatilidade"]
 
+            # Obter o histórico de preços
             query = text("""
                 SELECT open_price, close_price, data_registro
                 FROM historico_valor_cota
@@ -814,13 +902,15 @@ def get_state():
                 for row in result.mappings()
             ]
 
+            # Calcular o total investido
             query = text("""
-                SELECT COALESCE(SUM(CASE WHEN tipo = 'compra' THEN quantidade * valor_cota ELSE 0 END), 0) AS total_investido
+                SELECT COALESCE(SUM(CASE WHEN tipo = 'compra' THEN quantidade * valor_cota ELSE 0 END), 0) AS total_invested
                 FROM cotas_usuario
                 WHERE id_usuario = :id_usuario
             """)
             result = conn.execute(query, {"id_usuario": session["user_id"]})
-            total_invested = float(result.mappings().first()["total_investido"])
+            row = result.mappings().first()
+            total_invested = float(row["total_invested"]) if row and "total_invested" in row else 0.0
 
             return jsonify({
                 "balance": balance,
@@ -832,8 +922,8 @@ def get_state():
                 "mode": mode
             })
     except Exception as e:
-        logging.error(f"Erro ao obter estado: {e}")
-        return jsonify({"error": f"Erro ao obter dados: {e}"}), 500
+        logging.error(f"Erro ao obter estado: {str(e)}")
+        return jsonify({"error": f"Erro ao obter dados: {str(e)}"}), 500
 
 @cadastro.route("/api/trade", methods=["POST"])
 def trade():
@@ -889,7 +979,7 @@ def trade():
 
                 query = text("""
                     INSERT INTO transacoes (id_usuario, valor, descricao, tipo_transacao, data_transacao)
-                    VALUES (:id_usuario, :valor, :descricao, :tipo_transacao, :data_transacao)
+                    VALUES (:id_usuario, :valor, :descricao, :tipo_transacao, :data_transacao晴
                 """)
                 conn.execute(query, {
                     "id_usuario": session["user_id"],

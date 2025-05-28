@@ -3,84 +3,99 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tela Principal</title>
     <link rel="stylesheet" href="/static/css/styleTelaPrincipal.css">
-    <title>DuoMoney - Gerencie suas Finanças</title>
 </head>
 <body>
     <header class="header-container">
         <div class="logo-container">
-            <img src="/static/img/mascote.webp" alt="Mascote monedo" class="mascote">
+            <img src="/static/img/mascote.webp" alt="Mascote" class="mascote">
         </div>
         <div class="user-info">
-            <h1 class="username">{{ username }}</h1>
-            <span class="points">Moedas: <strong>{{ points }}</strong></span>
+            <div class="username">{{ username }}</div>
+            <div class="points">Moedas: {{ points }}</div>
         </div>
         <nav class="header-nav">
-            <button class="nav-button">Configuração</button>
+            <button class="nav-button" onclick="mostrarTela('configuracao')">Configuração</button>
         </nav>
     </header>
 
     <main>
-        <div id="inicio" class="tela ativa">
+        <section id="inicio" class="tela ativa">
             <div class="progress-bar">
                 <div class="progress-fill"></div>
             </div>
             {% if secoes %}
                 {% for secao in secoes %}
-                <section class="welcome-section" id="section-{{ secao.id }}">
+                <div class="welcome-section">
                     <h2>{{ secao.nome }}</h2>
                     <button class="action-button" onclick="toggleExercises('exercises-{{ secao.id }}')">Exercícios</button>
-                    <div id="exercises-{{ secao.id }}" class="exercises-container" style="display: none;">
+                    <div id="exercises-{{ secao.id }}" class="exercises-container">
                         {% for subtopico in secao.subtopicos %}
-                        <div class="exercise-circle" data-id="{{ subtopico.id }}">{{ subtopico.numero }}</div>
+                        <div class="exercise-circle 
+                                    {% if subtopico.status == 'concluido' %}completed{% endif %}
+                                    {% if subtopico.is_locked %}locked{% endif %}"
+                             data-id="{{ subtopico.id }}"
+                             title="{% if subtopico.is_locked %}Conclua o exercício anterior para desbloquear{% elif subtopico.status == 'concluido' %}Concluído{% else %}Disponível{% endif %}">
+                            {{ subtopico.numero }}
+                            {% if subtopico.status == 'concluido' %}
+                                <span class="status-icon completed-icon">✔</span>
+                            {% elif subtopico.is_locked %}
+                                <span class="status-icon locked-icon">🔒</span>
+                            {% endif %}
+                        </div>
                         {% endfor %}
                     </div>
-                </section>
+                </div>
                 {% endfor %}
             {% else %}
                 <p>Nenhuma seção disponível no momento.</p>
             {% endif %}
-        </div>
+        </section>
 
-        <div id="rank" class="tela">
+        <section id="rank" class="tela">
             <h1>Ranking dos Melhores</h1>
-            <div id="ranking-list" class="ranking-container">
-                <!-- Ranking será preenchido via JavaScript -->
+            <div class="ranking-container">
+                <div id="ranking-list"></div>
             </div>
-        </div>
+        </section>
 
-        <div id="simulador-de-investimento" class="tela">
+        <section id="simulador-de-investimento" class="tela">
             <h1>Simulador de Investimento</h1>
             <div class="investment-container">
                 <div class="grid">
                     <div class="investment-info">
-                        <p class="investment-stat">Moedas: <span id="balance">0.00</span></p>
-                        <p class="investment-stat">Cotas: <span id="shares">0</span></p>
-                        <p class="investment-stat">Preço da Cota: <span id="current-price">0.00</span></p>
+                        <h2>Informações do Investimento</h2>
+                        <div class="investment-stat">Moedas: <span id="balance">0.00</span></div>
+                        <div class="investment-stat">Cotas: <span id="shares">0</span></div>
+                        <div class="investment-stat">Preço da Cota: <span id="current-price">0.00</span></div>
                         <div class="action-group">
                             <label for="amount">Quantidade de Cotas:</label>
-                            <input type="number" id="amount" min="1" value="1">
-                            <button class="investment-action-button buy" onclick="handleTrade('buy')">Comprar</button>
-                            <button class="investment-action-button sell" onclick="handleTrade('sell')">Vender</button>
+                            <input type="number" id="amount" min="1">
+                            <div>
+                                <button class="investment-action-button buy" onclick="handleTrade('buy')">Comprar</button>
+                                <button class="investment-action-button sell" onclick="handleTrade('sell')">Vender</button>
+                            </div>
                         </div>
-                        <p id="message" class="volatility-message"></p>
                     </div>
                     <div class="investment-context">
-                        <p class="investment-stat">Variação Total: <span id="variation">0.00%</span></p>
-                        <p class="investment-stat">Total Investido: <span id="total-invested">0.00</span></p>
-                        <p class="investment-stat">Valor das Cotas: <span id="current-value">0.00</span></p>
-                        <p class="investment-stat">Tendência: <span id="trend">Estável</span></p>
+                        <h2>Contexto do Mercado</h2>
+                        <div class="investment-stat">Variação Total: <span id="variation">0.00%</span></div>
+                        <div class="investment-stat">Total Investido: <span id="total-invested">0.00</span></div>
+                        <div class="investment-stat">Valor das Cotas: <span id="current-value">0.00</span></div>
+                        <div class="investment-stat">Tendência: <span id="trend">Estável</span></div>
+                        <div class="volatility-message" id="message"></div>
                     </div>
                 </div>
-                <canvas id="chart" width="800" height="400"></canvas>
+                <canvas id="chart"></canvas>
             </div>
-        </div>
+        </section>
 
-        <div id="carteira-digital" class="tela">
+        <section id="carteira-digital" class="tela">
             <h1>Minha Carteira</h1>
             <div class="wallet-container">
                 <div class="wallet-summary">
-                    <p class="wallet-stat">Total de Moedas: <span id="wallet-balance">0.00</span></p>
+                    <div class="wallet-stat">Total de Moedas: <span id="wallet-balance">0.00</span></div>
                     <div class="wallet-actions">
                         <label for="transaction-filter">Filtrar por:</label>
                         <select id="transaction-filter">
@@ -90,18 +105,16 @@
                         </select>
                     </div>
                 </div>
-                <div id="wallet-history" class="wallet-history">
-                    <!-- Histórico será preenchido via JavaScript -->
-                </div>
+                <div class="wallet-history" id="wallet-history"></div>
                 <div class="pagination">
-                    <button class="pagination-button" onclick="changeWalletPage(-1)" disabled>Anterior</button>
+                    <button class="pagination-button" onclick="changeWalletPage(-1)">Anterior</button>
                     <span id="wallet-page">Página 1</span>
                     <button class="pagination-button" onclick="changeWalletPage(1)">Próxima</button>
                 </div>
             </div>
-        </div>
+        </section>
 
-        <div id="perfil" class="tela">
+        <section id="perfil" class="tela">
             <h1>Perfil</h1>
             <div class="profile-container">
                 {% if user_info %}
@@ -125,16 +138,21 @@
                 <p>Informações do usuário não disponíveis.</p>
                 {% endif %}
             </div>
-        </div>
+        </section>
+
+        <section id="configuracao" class="tela">
+            <h1>Configuração</h1>
+            <p>Configurações do usuário (em desenvolvimento).</p>
+        </section>
     </main>
 
     <footer class="footer-container">
         <div class="footer-links">
-            <button class="footer-link" onclick="mostrarTela('inicio')">Início</button>
-            <button class="footer-link" onclick="mostrarTela('rank')">Rank</button>
-            <button class="footer-link" onclick="mostrarTela('simulador-de-investimento')">Simulador de Investimento</button>
-            <button class="footer-link" onclick="mostrarTela('carteira-digital')">Carteira Digital</button>
-            <button class="footer-link" onclick="mostrarTela('perfil')">Perfil</button>
+            <a class="footer-link" onclick="mostrarTela('inicio')">Início</a>
+            <a class="footer-link" onclick="mostrarTela('rank')">Rank</a>
+            <a class="footer-link" onclick="mostrarTela('simulador-de-investimento')">Simulador de Investimento</a>
+            <a class="footer-link" onclick="mostrarTela('carteira-digital')">Carteira Digital</a>
+            <a class="footer-link" onclick="mostrarTela('perfil')">Perfil</a>
         </div>
     </footer>
 
