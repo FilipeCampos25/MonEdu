@@ -6,9 +6,12 @@ import hashlib
 import os
 import logging
 from dotenv import load_dotenv
-from funcoes import Email_sender, objeto
+from funcoes import Email_sender
+from funcoes.objeto import Usuario, CarteiraVirtual, Progresso, Rank, Gamificacao
 import random
 from decimal import Decimal
+import pickle
+import base64
 
 # Carregar variáveis de ambiente
 load_dotenv()
@@ -25,10 +28,8 @@ logging.basicConfig(
 # Configuração do banco de dados
 DATABASE_URL = os.getenv("DATABASE_URL")
 if DATABASE_URL:
-    # PostgreSQL no Render (Neon)
     engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 else:
-    # SQLite local
     db_path = os.path.join(os.path.dirname(__file__), 'local_database.db')
     engine = create_engine(f"sqlite:///{db_path}", pool_pre_ping=True)
 
@@ -43,14 +44,19 @@ def process_text(text):
     text = text.replace('\\n', '\n')
     return text
 
+# Função para serializar objeto para a sessão
+def serialize_object(obj):
+    return base64.b64encode(pickle.dumps(obj)).decode('utf-8')
+
+# Função para desserializar objeto da sessão
+def deserialize_object(serialized):
+    return pickle.loads(base64.b64decode(serialized))
+
 # Inicialização do banco de dados
 def init_db():
     try:
         with engine.connect() as conn:
-            # Detectar se é PostgreSQL
             is_postgres = engine.dialect.name == "postgresql"
-
-            # Criar a tabela usuarios
             id_type = "SERIAL" if is_postgres else "INTEGER"
             auto_increment = "" if is_postgres else "AUTOINCREMENT"
             conn.execute(text(f"""
@@ -64,8 +70,6 @@ def init_db():
                     moedas DECIMAL(10, 2) DEFAULT 0.00
                 )
             """))
-
-            # Criar tabela licao
             conn.execute(text(f"""
                 CREATE TABLE IF NOT EXISTS licao (
                     id_licao {id_type} PRIMARY KEY {auto_increment},
@@ -75,8 +79,6 @@ def init_db():
                     pontos_recompensa INTEGER
                 )
             """))
-
-            # Criar tabela perguntas
             conn.execute(text(f"""
                 CREATE TABLE IF NOT EXISTS perguntas (
                     id_pergunta {id_type} PRIMARY KEY {auto_increment},
@@ -87,8 +89,6 @@ def init_db():
                     FOREIGN KEY (id_licao) REFERENCES licao (id_licao)
                 )
             """))
-
-            # Criar tabela gamificacao
             conn.execute(text(f"""
                 CREATE TABLE IF NOT EXISTS gamificacao (
                     id_gamificacao {id_type} PRIMARY KEY {auto_increment},
@@ -102,8 +102,6 @@ def init_db():
                     UNIQUE (id_usuario, id_licao, tipo)
                 )
             """))
-
-            # Criar tabela progresso
             conn.execute(text(f"""
                 CREATE TABLE IF NOT EXISTS progresso (
                     id_progresso {id_type} PRIMARY KEY {auto_increment},
@@ -111,13 +109,12 @@ def init_db():
                     id_licao INTEGER,
                     status_progresso VARCHAR(20),
                     data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    pontos_ganhos INTEGER DEFAULT 0,
                     FOREIGN KEY (id_usuario) REFERENCES usuarios (id_usuarios),
                     FOREIGN KEY (id_licao) REFERENCES licao (id_licao),
                     UNIQUE (id_usuario, id_licao)
                 )
             """))
-
-            # Criar tabela transacoes
             conn.execute(text(f"""
                 CREATE TABLE IF NOT EXISTS transacoes (
                     id_transacao {id_type} PRIMARY KEY {auto_increment},
@@ -129,8 +126,6 @@ def init_db():
                     FOREIGN KEY (id_usuario) REFERENCES usuarios (id_usuarios)
                 )
             """))
-
-            # Criar outras tabelas
             conn.execute(text(f"""
                 CREATE TABLE IF NOT EXISTS topicos (
                     id {id_type} PRIMARY KEY {auto_increment},
@@ -161,8 +156,6 @@ def init_db():
                     FOREIGN KEY (subtopico_id) REFERENCES subtopicos (id) ON DELETE CASCADE
                 )
             """))
-
-            # Criar tabela cotas_usuario
             conn.execute(text(f"""
                 CREATE TABLE IF NOT EXISTS cotas_usuario (
                     id_cota {id_type} PRIMARY KEY {auto_increment},
@@ -174,8 +167,6 @@ def init_db():
                     FOREIGN KEY (id_usuario) REFERENCES usuarios (id_usuarios)
                 )
             """))
-
-            # Criar tabela valor_cota_atual
             conn.execute(text(f"""
                 CREATE TABLE IF NOT EXISTS valor_cota_atual (
                     id {id_type} PRIMARY KEY {auto_increment},
@@ -184,8 +175,6 @@ def init_db():
                     ultima_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """))
-
-            # Criar tabela historico_valor_cota
             conn.execute(text(f"""
                 CREATE TABLE IF NOT EXISTS historico_valor_cota (
                     id {id_type} PRIMARY KEY {auto_increment},
@@ -196,14 +185,11 @@ def init_db():
                     data_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """))
-
-            # Inserir valor inicial da cota se a tabela estiver vazia
             conn.execute(text("""
                 INSERT INTO valor_cota_atual (valor_cota, volatilidade, ultima_atualizacao)
                 SELECT 50.00, 'padrao', CURRENT_TIMESTAMP
                 WHERE NOT EXISTS (SELECT 1 FROM valor_cota_atual)
             """))
-
             conn.commit()
             logging.info("Tabelas verificadas/criadas com sucesso.")
     except Exception as err:
@@ -218,34 +204,23 @@ def index():
 # Rota para a tela principal
 @cadastro.route("/tela")
 def tela():
-    if "user_id" not in session:
+    if "user_id" not in session or "usuario_obj" not in session:
         flash("Por favor, faça login para acessar esta página.")
         return redirect(url_for("index"))
 
     try:
+        usuario = deserialize_object(session["usuario_obj"])
+        username = usuario.nome
+        points = usuario._Usuario__carteira.pontos
+        user_info = {
+            "nome": usuario.nome,
+            "idade": None,
+            "email": usuario.email,
+            "data_criacao": usuario.data_nascimento,
+            "moedas": float(points)
+        }
+
         with engine.connect() as conn:
-            query = text("""
-                SELECT nome, idade, email, data_criacao, moedas 
-                FROM usuarios 
-                WHERE id_usuarios = :user_id
-            """)
-            result = conn.execute(query, {"user_id": session["user_id"]})
-            user_data = result.mappings().first()
-            if not user_data:
-                flash("Usuário não encontrado.")
-                session.pop("user_id", None)
-                return redirect(url_for("index"))
-
-            username = user_data["nome"]
-            user_info = {
-                "nome": user_data["nome"],
-                "idade": user_data["idade"],
-                "email": user_data["email"],
-                "data_criacao": user_data["data_criacao"].strftime("%d/%m/%Y %H:%M:%S"),
-                "moedas": float(user_data["moedas"])
-            }
-            points = float(user_data["moedas"])
-
             query = text("SELECT id, nome, licao_id FROM topicos ORDER BY ordem")
             result = conn.execute(query)
             topicos = result.mappings().all()
@@ -261,41 +236,23 @@ def tela():
                 result = conn.execute(query, {"topico_id": topico["id"]})
                 subtopicos = result.mappings().all()
 
-                # Verificar o progresso de cada subtema
                 subtopicos_with_status = []
                 for index, subtopico in enumerate(subtopicos):
-                    # Obter a lição associada ao subtema
-                    query = text("""
-                        SELECT p.status_progresso
-                        FROM progresso p
-                        JOIN topicos t ON p.id_licao = t.licao_id
-                        JOIN subtopicos s ON s.topico_id = t.id
-                        WHERE s.id = :subtopico_id AND p.id_usuario = :user_id
-                    """)
-                    result = conn.execute(query, {
-                        "subtopico_id": subtopico["id"],
-                        "user_id": session["user_id"]
-                    })
-                    progress = result.mappings().first()
-                    status = progress["status_progresso"] if progress else "nao_iniciado"
+                    status = "nao_iniciado"
+                    for progresso in usuario._Usuario__progressos:
+                        if progresso.id_licao == topico["licao_id"]:
+                            status = progresso.status_progresso
+                            break
 
-                    # Verificar se o subtema anterior foi concluído
                     is_locked = False
                     if index > 0:
                         prev_subtopico = subtopicos[index - 1]
-                        query = text("""
-                            SELECT p.status_progresso
-                            FROM progresso p
-                            JOIN topicos t ON p.id_licao = t.licao_id
-                            JOIN subtopicos s ON s.topico_id = t.id
-                            WHERE s.id = :prev_subtopico_id AND p.id_usuario = :user_id
-                        """)
-                        result = conn.execute(query, {
-                            "prev_subtopico_id": prev_subtopico["id"],
-                            "user_id": session["user_id"]
-                        })
-                        prev_progress = result.mappings().first()
-                        is_locked = not prev_progress or prev_progress["status_progresso"] != "concluido"
+                        prev_status = "nao_iniciado"
+                        for progresso in usuario._Usuario__progressos:
+                            if progresso.id_licao == topico["licao_id"]:
+                                prev_status = progresso.status_progresso
+                                break
+                        is_locked = prev_status != "concluido"
 
                     subtopicos_with_status.append({
                         "id": subtopico["id"],
@@ -344,18 +301,44 @@ def submit():
                     return response
 
                 password_hash = hash_password(password)
-
                 query = text("""
-                    SELECT id_usuarios, nome, senha 
+                    SELECT id_usuarios, nome, email, senha, data_criacao, moedas 
                     FROM usuarios 
                     WHERE nome = :username
                 """)
                 result = conn.execute(query, {"username": username})
-                user = result.mappings().first()
+                user_data = result.mappings().first()
 
-                if user and user["senha"] == password_hash:
-                    session["user_id"] = user["id_usuarios"]
-                    session["username"] = user["nome"]
+                if user_data and user_data["senha"] == password_hash:
+                    usuario = Usuario(
+                        id=user_data["id_usuarios"],
+                        nome=user_data["nome"],
+                        email=user_data["email"],
+                        senha=password,
+                        data_nascimento=user_data["data_criacao"].strftime("%Y-%m-%d")
+                    )
+                    usuario._Usuario__carteira = CarteiraVirtual()
+                    usuario._Usuario__carteira.receita(float(user_data["moedas"]))
+
+                    query = text("""
+                        SELECT id_progresso, id_licao, status_progresso, pontos_ganhos
+                        FROM progresso
+                        WHERE id_usuario = :id_usuario
+                    """)
+                    result = conn.execute(query, {"id_usuario": user_data["id_usuarios"]})
+                    for progresso_data in result.mappings():
+                        progresso = Progresso(
+                            id_progresso=progresso_data["id_progresso"],
+                            id_usuario=user_data["id_usuarios"],
+                            id_licao=progresso_data["id_licao"],
+                            status_progresso=progresso_data["status_progresso"],
+                            pontos_ganho=progresso_data["pontos_ganhos"]
+                        )
+                        usuario._Usuario__progressos.append(progresso)
+
+                    session["user_id"] = user_data["id_usuarios"]
+                    session["username"] = user_data["nome"]
+                    session["usuario_obj"] = serialize_object(usuario)
                     flash("Login realizado com sucesso!")
                     logging.info(f"Login bem-sucedido para o usuário: {username}")
                     response = make_response(redirect(url_for("tela")))
@@ -367,17 +350,12 @@ def submit():
                     response = make_response(redirect(url_for("index")))
                     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
                     return response
-
             else:
                 username = request.form.get("username")
                 email = request.form.get("email")
                 password = request.form.get("password")
                 confirm_password = request.form.get("confirm_password")
                 birth_date = request.form.get("birth_date")
-
-                logging.debug(
-                    f"Dados do formulário: username={username}, email={email}, birth_date={birth_date}"
-                )
 
                 if not all([username, email, password, confirm_password, birth_date]):
                     flash("Preencha todos os campos de cadastro.")
@@ -394,24 +372,12 @@ def submit():
                     return response
 
                 try:
-                    datetime.strptime(birth_date, "%Y-%m-%d")
-                except ValueError:
-                    flash("Formato de data de nascimento inválido. Use AAAA-MM-DD.")
-                    logging.error(f"Formato de birth_date inválido: {birth_date}")
-                    response = make_response(redirect(url_for("index")))
-                    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
-                    return response
-
-                try:
-                    usuario = objeto.Usuario(
+                    usuario = Usuario(
                         id=None,
                         nome=username,
                         email=email,
                         senha=password,
-                        data_nascimento=birth_date,
-                    )
-                    logging.info(
-                        f"Objeto Usuario criado: id={usuario.id}, nome={usuario.nome}, email={usuario.email}, data_nascimento={usuario.data_nascimento}"
+                        data_nascimento=birth_date
                     )
                 except ValueError as e:
                     flash(f"Erro ao criar usuário: {str(e)}")
@@ -422,9 +388,7 @@ def submit():
 
                 birth = datetime.strptime(birth_date, "%Y-%m-%d")
                 today = datetime.now()
-                idade = today.year - birth.year - (
-                    (today.month, today.day) < (birth.month, birth.day)
-                )
+                idade = today.year - birth.year - ((today.month, today.day) < (birth.month, birth.day))
                 password_hash = hash_password(password)
 
                 query = text("SELECT * FROM usuarios WHERE nome = :username OR email = :email")
@@ -441,32 +405,26 @@ def submit():
                     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
                     return response
 
-                try:
-                    query = text("""
-                        INSERT INTO usuarios (nome, idade, email, senha, data_criacao, moedas)
-                        VALUES (:nome, :idade, :email, :senha, :data_criacao, :moedas)
-                        RETURNING id_usuarios
-                    """)
-                    result = conn.execute(query, {
-                        "nome": username,
-                        "idade": idade,
-                        "email": email,
-                        "senha": password_hash,
-                        "data_criacao": datetime.now(),
-                        "moedas": 0.00
-                    })
-                    user_id = result.mappings().first()["id_usuarios"]
-                except Exception as e:
-                    flash("E-mail já está registrado!")
-                    logging.error(f"Erro de unicidade no cadastro: {e}")
-                    response = make_response(redirect(url_for("index")))
-                    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
-                    return response
-
+                query = text("""
+                    INSERT INTO usuarios (nome, idade, email, senha, data_criacao, moedas)
+                    VALUES (:nome, :idade, :email, :senha, :data_criacao, :moedas)
+                    RETURNING id_usuarios
+                """)
+                result = conn.execute(query, {
+                    "nome": username,
+                    "idade": idade,
+                    "email": email,
+                    "senha": password_hash,
+                    "data_criacao": datetime.now(),
+                    "moedas": 0.00
+                })
+                user_id = result.mappings().first()["id_usuarios"]
                 conn.commit()
 
+                usuario._Usuario__id = user_id
                 session["user_id"] = user_id
                 session["username"] = username
+                session["usuario_obj"] = serialize_object(usuario)
 
                 try:
                     Email_sender.e_mail(email, username)
@@ -506,7 +464,6 @@ def get_content(subtopico_id):
 
     try:
         with engine.connect() as conn:
-            # Verificar se o subtema existe
             query = text("SELECT id, topico_id, ordem FROM subtopicos WHERE id = :subtopico_id")
             result = conn.execute(query, {"subtopico_id": subtopico_id})
             subtopico = result.mappings().first()
@@ -514,7 +471,6 @@ def get_content(subtopico_id):
                 logging.error(f"Subtema com ID {subtopico_id} não encontrado")
                 return jsonify({"error": "Subtema não encontrado"}), 404
 
-            # Obter a lição associada ao subtema
             query = text("""
                 SELECT t.licao_id
                 FROM subtopicos s
@@ -528,7 +484,6 @@ def get_content(subtopico_id):
                 return jsonify({"error": "Lição não encontrada para este subtema"}), 404
             licao_id = licao["licao_id"]
 
-            # Verificar se o subtema anterior foi concluído
             query = text("""
                 SELECT s.id
                 FROM subtopicos s
@@ -542,24 +497,17 @@ def get_content(subtopico_id):
             })
             prev_subtopico = result.mappings().first()
 
+            usuario = deserialize_object(session["usuario_obj"])
             if prev_subtopico:
-                query = text("""
-                    SELECT p.status_progresso
-                    FROM progresso p
-                    JOIN topicos t ON p.id_licao = t.licao_id
-                    JOIN subtopicos s ON s.topico_id = t.id
-                    WHERE s.id = :prev_subtopico_id AND p.id_usuario = :user_id
-                """)
-                result = conn.execute(query, {
-                    "prev_subtopico_id": prev_subtopico["id"],
-                    "user_id": session["user_id"]
-                })
-                prev_progress = result.mappings().first()
-                if not prev_progress or prev_progress["status_progresso"] != "concluido":
+                prev_status = "nao_iniciado"
+                for progresso in usuario._Usuario__progressos:
+                    if progresso.id_licao == licao_id:
+                        prev_status = progresso.status_progresso
+                        break
+                if prev_status != "concluido":
                     logging.info(f"Subtema {subtopico_id} bloqueado: subtema anterior não concluído")
                     return jsonify({"error": "Subtema bloqueado. Conclua o subtema anterior primeiro."}), 403
 
-            # Obter conteúdos do subtema
             query_content = text("""
                 SELECT numero, titulo, texto
                 FROM conteudos
@@ -571,7 +519,6 @@ def get_content(subtopico_id):
             if not df_content.empty:
                 df_content['texto'] = df_content['texto'].apply(process_text)
 
-            # Obter perguntas da lição
             query = text("""
                 SELECT id_pergunta, enunciado, resposta_correta, opcoes
                 FROM perguntas
@@ -604,7 +551,7 @@ def get_content(subtopico_id):
 # Rota para salvar progresso e moedas
 @cadastro.route("/save_progress", methods=["POST"])
 def save_progress():
-    if "user_id" not in session:
+    if "user_id" not in session or "usuario_obj" not in session:
         logging.error("Tentativa de salvar progresso sem usuário autenticado")
         return jsonify({"error": "Usuário não autenticado"}), 401
 
@@ -618,7 +565,6 @@ def save_progress():
     licao_id = data.get("licao_id")
     points = data.get("points")
 
-    # Validação mais robusta
     if licao_id is None or not isinstance(licao_id, int):
         logging.error(f"Dados inválidos - licao_id: {licao_id}, points: {points}")
         return jsonify({"error": f"Dados inválidos: licao_id={licao_id} deve ser um número inteiro"}), 400
@@ -627,12 +573,12 @@ def save_progress():
         logging.error(f"Dados inválidos - licao_id: {licao_id}, points: {points}")
         return jsonify({"error": f"Dados inválidos: points={points} deve ser um número não negativo"}), 400
 
-    # Usar o valor de points enviado pelo frontend como moedas_ganhas
     moedas_ganhas = float(points)
 
     try:
+        usuario = deserialize_object(session["usuario_obj"])
+
         with engine.connect() as conn:
-            # Verificar se a lição existe
             query = text("""
                 SELECT id_licao
                 FROM licao
@@ -643,7 +589,44 @@ def save_progress():
                 logging.error(f"Lição não encontrada: id_licao={licao_id}")
                 return jsonify({"error": "Lição não encontrada"}), 404
 
-            # Verificar se o progresso já existe
+            for progresso in usuario._Usuario__progressos:
+                if progresso.id_licao == licao_id and progresso.status_progresso == "concluido":
+                    logging.info(f"Lição {licao_id} já concluída para usuário {session['user_id']}")
+                    return jsonify({"error": "Lição já concluída"}), 400
+
+            progresso_existente = None
+            for progresso in usuario._Usuario__progressos:
+                if progresso.id_licao == licao_id:
+                    progresso_existente = progresso
+                    break
+
+            if progresso_existente:
+                usuario.atualizar_progresso(progresso_existente.id_progresso, "concluido", moedas_ganhas)
+            else:
+                query = text("""
+                    INSERT INTO progresso (id_usuario, id_licao, status_progresso, data_criacao, pontos_ganhos)
+                    VALUES (:id_usuario, :id_licao, :status, :data_criacao, :pontos_ganhos)
+                    RETURNING id_progresso
+                """)
+                result = conn.execute(query, {
+                    "id_usuario": session["user_id"],
+                    "id_licao": licao_id,
+                    "status": "iniciado",
+                    "data_criacao": datetime.now(),
+                    "pontos_ganhos": 0
+                })
+                id_progresso = result.mappings().first()["id_progresso"]
+                usuario.adicionar_progresso(id_progresso, licao_id)
+                usuario.atualizar_progresso(id_progresso, "concluido", moedas_ganhas)
+
+            gamificacao = Gamificacao(
+                id_gamificacao=random.randint(1, 1000000),
+                id_usuario=session["user_id"],
+                tipo="moeda",
+                valor=int(moedas_ganhas)
+            )
+            resultado = gamificacao.aplicar_gamificacao(usuario)
+
             query = text("""
                 SELECT status_progresso
                 FROM progresso
@@ -655,11 +638,6 @@ def save_progress():
             })
             existing_progress = result.mappings().first()
 
-            if existing_progress and existing_progress["status_progresso"] == "concluido":
-                logging.info(f"Lição {licao_id} já concluída para usuário {session['user_id']}")
-                return jsonify({"error": "Lição já concluída"}), 400
-
-            # Atualizar ou inserir progresso
             if existing_progress:
                 query = text("""
                     UPDATE progresso
@@ -686,18 +664,16 @@ def save_progress():
                     "pontos_ganhos": moedas_ganhas
                 })
 
-            # Atualizar moedas do usuário
             query = text("""
                 UPDATE usuarios
-                SET moedas = moedas + :moedas
+                SET moedas = :moedas
                 WHERE id_usuarios = :id_usuario
             """)
             conn.execute(query, {
-                "moedas": moedas_ganhas,
+                "moedas": usuario._Usuario__carteira.pontos,
                 "id_usuario": session["user_id"]
             })
 
-            # Registrar transação
             query = text("""
                 INSERT INTO transacoes (id_usuario, valor, descricao, tipo_transacao, data_transacao)
                 VALUES (:id_usuario, :valor, :descricao, :tipo_transacao, :data_transacao)
@@ -710,7 +686,6 @@ def save_progress():
                 "data_transacao": datetime.now()
             })
 
-            # Atualizar ou inserir gamificação
             query = text("""
                 SELECT valor
                 FROM gamificacao
@@ -751,6 +726,7 @@ def save_progress():
                 })
 
             conn.commit()
+            session["usuario_obj"] = serialize_object(usuario)
             logging.info(f"Progresso salvo com sucesso: licao_id={licao_id}, moedas_ganhas={moedas_ganhas}")
             return jsonify({
                 "message": "Progresso salvo com sucesso",
@@ -767,15 +743,46 @@ def get_ranking():
     try:
         with engine.connect() as conn:
             query = text("""
-                SELECT nome AS username, moedas AS total_pontos
+                SELECT id_usuarios, nome, email, senha, data_criacao, moedas 
                 FROM usuarios
-                ORDER BY moedas DESC
-                LIMIT 10
             """)
             result = conn.execute(query)
-            ranking = result.mappings().all()
-            ranking_list = [{"username": row["username"], "total_pontos": float(row["total_pontos"])} for row in ranking]
-            return jsonify({"ranking": ranking_list})
+            usuarios = []
+            for row in result.mappings():
+                usuario = Usuario(
+                    id=row["id_usuarios"],
+                    nome=row["nome"],
+                    email=row["email"],
+                    senha=row["senha"],
+                    data_nascimento=row["data_criacao"].strftime("%Y-%m-%d")
+                )
+                usuario._Usuario__carteira.receita(float(row["moedas"]))
+                usuarios.append(usuario)
+
+            usuario_atual = deserialize_object(session["usuario_obj"])
+            rank = Rank(usuarios, usuario_atual)
+            rank.insertion_sort()
+            
+            ranking_list = [
+                {"username": usuario.nome, "total_pontos": float(pontuacao)}
+                for pontuacao, usuario in rank.ranking[:10]
+            ]
+            
+            posicao_atual = -1
+            for i, (_, usuario) in enumerate(rank.ranking):
+                if usuario == usuario_atual:
+                    posicao_atual = i + 1
+                    break
+
+            response = {"ranking": ranking_list}
+            if posicao_atual > 10:
+                response["user_position"] = {
+                    "position": posicao_atual,
+                    "username": usuario_atual.nome,
+                    "total_pontos": float(usuario_atual._Usuario__carteira.pontos)
+                }
+
+            return jsonify(response)
     except Exception as e:
         logging.error(f"Erro ao obter ranking: {e}")
         return jsonify({"error": f"Erro ao obter ranking: {e}"}), 500
@@ -783,10 +790,13 @@ def get_ranking():
 # Rota para obter histórico de transações da carteira digital
 @cadastro.route("/get_wallet_history", methods=["GET"])
 def get_wallet_history():
-    if "user_id" not in session:
+    if "user_id" not in session or "usuario_obj" not in session:
         return jsonify({"error": "Usuário não autenticado"}), 401
 
     try:
+        usuario = deserialize_object(session["usuario_obj"])
+        balance = float(usuario._Usuario__carteira.pontos)
+
         with engine.connect() as conn:
             page = int(request.args.get("page", 1))
             per_page = int(request.args.get("per_page", 10))
@@ -823,14 +833,6 @@ def get_wallet_history():
             result = conn.execute(query_count, {"id_usuario": session["user_id"]})
             total_transactions = result.mappings().first()["total"]
 
-            query_balance = text("""
-                SELECT moedas
-                FROM usuarios
-                WHERE id_usuarios = :id_usuario
-            """)
-            result = conn.execute(query_balance, {"id_usuario": session["user_id"]})
-            balance = float(result.mappings().first()["moedas"])
-
             transactions_list = [
                 {
                     "valor": float(row["valor"]),
@@ -854,21 +856,14 @@ def get_wallet_history():
 # Rotas do Simulador de Investimento
 @cadastro.route("/api/state", methods=["GET"])
 def get_state():
-    if "user_id" not in session:
+    if "user_id" not in session or "usuario_obj" not in session:
         return jsonify({"error": "Usuário não autenticado"}), 401
 
     try:
-        with engine.connect() as conn:
-            # Obter o saldo de moedas do usuário
-            query = text("""
-                SELECT moedas
-                FROM usuarios
-                WHERE id_usuarios = :id_usuario
-            """)
-            result = conn.execute(query, {"id_usuario": session["user_id"]})
-            balance = float(result.mappings().first()["moedas"])
+        usuario = deserialize_object(session["usuario_obj"])
+        balance = float(usuario._Usuario__carteira.pontos)
 
-            # Obter o total de cotas
+        with engine.connect() as conn:
             query = text("""
                 SELECT COALESCE(SUM(CASE WHEN tipo = 'compra' THEN quantidade ELSE -quantidade END), 0) AS total_cotas
                 FROM cotas_usuario
@@ -877,14 +872,12 @@ def get_state():
             result = conn.execute(query, {"id_usuario": session["user_id"]})
             shares = int(result.mappings().first()["total_cotas"])
 
-            # Obter o valor atual da cota
             query = text("SELECT valor_cota, volatilidade FROM valor_cota_atual ORDER BY id DESC LIMIT 1")
             result = conn.execute(query)
             cota_data = result.mappings().first()
             current_price = float(cota_data["valor_cota"])
             mode = cota_data["volatilidade"]
 
-            # Obter o histórico de preços
             query = text("""
                 SELECT open_price, close_price, data_registro
                 FROM historico_valor_cota
@@ -902,15 +895,13 @@ def get_state():
                 for row in result.mappings()
             ]
 
-            # Calcular o total investido
             query = text("""
                 SELECT COALESCE(SUM(CASE WHEN tipo = 'compra' THEN quantidade * valor_cota ELSE 0 END), 0) AS total_invested
                 FROM cotas_usuario
                 WHERE id_usuario = :id_usuario
             """)
             result = conn.execute(query, {"id_usuario": session["user_id"]})
-            row = result.mappings().first()
-            total_invested = float(row["total_invested"]) if row and "total_invested" in row else 0.0
+            total_invested = float(result.mappings().first()["total_invested"])
 
             return jsonify({
                 "balance": balance,
@@ -927,7 +918,7 @@ def get_state():
 
 @cadastro.route("/api/trade", methods=["POST"])
 def trade():
-    if "user_id" not in session:
+    if "user_id" not in session or "usuario_obj" not in session:
         return jsonify({"error": "Usuário não autenticado"}), 401
 
     data = request.get_json()
@@ -938,6 +929,7 @@ def trade():
         return jsonify({"error": "Quantidade inválida"}), 400
 
     try:
+        usuario = deserialize_object(session["usuario_obj"])
         with engine.connect() as conn:
             query = text("SELECT valor_cota FROM valor_cota_atual ORDER BY id DESC LIMIT 1")
             result = conn.execute(query)
@@ -945,27 +937,10 @@ def trade():
 
             if action == "buy":
                 total_cost = amount * current_price
-                query = text("""
-                    SELECT moedas
-                    FROM usuarios
-                    WHERE id_usuarios = :id_usuario
-                """)
-                result = conn.execute(query, {"id_usuario": session["user_id"]})
-                balance = float(result.mappings().first()["moedas"])
-
-                if total_cost > balance:
+                if total_cost > usuario._Usuario__carteira.pontos:
                     return jsonify({"error": "Saldo de moedas insuficiente"}), 400
 
-                query = text("""
-                    UPDATE usuarios
-                    SET moedas = moedas - :total_cost
-                    WHERE id_usuarios = :id_usuario
-                """)
-                conn.execute(query, {
-                    "total_cost": total_cost,
-                    "id_usuario": session["user_id"]
-                })
-
+                usuario.retirar_moedas(total_cost)
                 query = text("""
                     INSERT INTO cotas_usuario (id_usuario, quantidade, valor_cota, tipo, data_transacao)
                     VALUES (:id_usuario, :quantidade, :valor_cota, 'compra', :data_transacao)
@@ -979,7 +954,7 @@ def trade():
 
                 query = text("""
                     INSERT INTO transacoes (id_usuario, valor, descricao, tipo_transacao, data_transacao)
-                    VALUES (:id_usuario, :valor, :descricao, :tipo_transacao, :data_transacao晴
+                    VALUES (:id_usuario, :valor, :descricao, :tipo_transacao, :data_transacao)
                 """)
                 conn.execute(query, {
                     "id_usuario": session["user_id"],
@@ -989,7 +964,18 @@ def trade():
                     "data_transacao": datetime.now()
                 })
 
+                query = text("""
+                    UPDATE usuarios
+                    SET moedas = :moedas
+                    WHERE id_usuarios = :id_usuario
+                """)
+                conn.execute(query, {
+                    "moedas": usuario._Usuario__carteira.pontos,
+                    "id_usuario": session["user_id"]
+                })
+
                 conn.commit()
+                session["usuario_obj"] = serialize_object(usuario)
                 return jsonify({"message": f"Comprou {amount} cotas por {total_cost:.2f} moedas"})
 
             elif action == "sell":
@@ -1005,16 +991,7 @@ def trade():
                     return jsonify({"error": "Cotas insuficientes"}), 400
 
                 total_value = amount * current_price
-
-                query = text("""
-                    UPDATE usuarios
-                    SET moedas = moedas + :total_value
-                    WHERE id_usuarios = :id_usuario
-                """)
-                conn.execute(query, {
-                    "total_value": total_value,
-                    "id_usuario": session["user_id"]
-                })
+                usuario.adicionar_moedas(total_value)
 
                 query = text("""
                     INSERT INTO cotas_usuario (id_usuario, quantidade, valor_cota, tipo, data_transacao)
@@ -1039,7 +1016,18 @@ def trade():
                     "data_transacao": datetime.now()
                 })
 
+                query = text("""
+                    UPDATE usuarios
+                    SET moedas = :moedas
+                    WHERE id_usuarios = :id_usuario
+                """)
+                conn.execute(query, {
+                    "moedas": usuario._Usuario__carteira.pontos,
+                    "id_usuario": session["user_id"]
+                })
+
                 conn.commit()
+                session["usuario_obj"] = serialize_object(usuario)
                 return jsonify({"message": f"Vendeu {amount} cotas por {total_value:.2f} moedas"})
 
             return jsonify({"error": "Ação inválida"}), 400
@@ -1059,12 +1047,10 @@ def update_price():
             mode = cota_data["volatilidade"]
             ultima_atualizacao = cota_data["ultima_atualizacao"]
 
-            # Verificar se passou pelo menos 1 dia para atualizar o preço
             current_time = datetime.now()
             time_diff = current_time - ultima_atualizacao
-            days_passed = time_diff.total_seconds() / (60 * 60 * 24)  # Converter para dias
+            days_passed = time_diff.total_seconds() / (60 * 60 * 24)
 
-            # Verificar se passou pelo menos 7 dias para atualizar a volatilidade
             if days_passed >= 7:
                 modes = ['padrao', 'pico_valorizacao', 'pico_desvalorizacao']
                 mode = random.choice(modes)
@@ -1079,7 +1065,6 @@ def update_price():
                 })
                 logging.debug(f"Modo atualizado para: {mode}")
 
-            # Atualizar preço da cota apenas se passou pelo menos 1 dia
             if days_passed >= 1:
                 variation = random.uniform(0.02, 0.05)
                 if mode == "pico_valorizacao" and random.random() <= 0.6:
@@ -1150,6 +1135,15 @@ def set_mode():
     except Exception as e:
         logging.error(f"Erro ao definir modo: {e}")
         return jsonify({"error": f"Erro ao definir modo: {e}"}), 500
+
+# Rota para logout
+@cadastro.route("/logout")
+def logout():
+    session.pop("user_id", None)
+    session.pop("username", None)
+    session.pop("usuario_obj", None)
+    flash("Logout realizado com sucesso!")
+    return redirect(url_for("index"))
 
 if __name__ == "__main__":
     init_db()

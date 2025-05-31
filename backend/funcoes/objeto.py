@@ -1,4 +1,3 @@
-
 class CarteiraVirtual:
     def __init__(self):
         self.saldo = 0  # Saldo em moedas, que também representa os pontos
@@ -30,14 +29,13 @@ class CarteiraVirtual:
 class Progresso:
     def __init__(self, id_progresso: int, id_usuario: int, id_licao: int, status_progresso: str = "iniciado", pontos_ganho: int = 0):
         self.id_progresso = id_progresso
-        self.id_usuario = id_usuario  # Adicionado conforme a lista
+        self.id_usuario = id_usuario
         self.id_licao = id_licao
         self.status_progresso = status_progresso
         self.pontos_ganho = pontos_ganho
 
     def atualizar_status(self, novo_status: str, carteira: CarteiraVirtual = None):
         self.status_progresso = novo_status
-        # Sincroniza pontos com a carteira ao concluir
         if novo_status == "concluído" and carteira and self.pontos_ganho > 0:
             carteira.receita(self.pontos_ganho)
 
@@ -49,7 +47,7 @@ class Progresso:
     def to_dict(self):
         return {
             "id_progresso": self.id_progresso,
-            "id_usuario": self.id_usuario,  # Incluído no dict
+            "id_usuario": self.id_usuario,
             "id_licao": self.id_licao,
             "status_progresso": self.status_progresso,
             "pontos_ganho": self.pontos_ganho
@@ -114,7 +112,7 @@ class Usuario:
 
     def to_dict(self):
         return {
-            "id": self.__id,  # Incluído no dict
+            "id": self.__id,
             "nome": self.__nome,
             "email": self.__email,
             "senha": self.__senha,
@@ -143,13 +141,11 @@ class Usuario:
     def ver_saldo(self):
         return self.__carteira.consultar_saldo()
 
-    # Método para adicionar um progresso
     def adicionar_progresso(self, id_progresso: int, id_licao: int):
         progresso = Progresso(id_progresso, self.__id, id_licao)
         self.__progressos.append(progresso)
         return progresso
 
-    # Método para atualizar progresso e sincronizar pontos
     def atualizar_progresso(self, id_progresso: int, novo_status: str, pontos: int = 0):
         for progresso in self.__progressos:
             if progresso.id_progresso == id_progresso:
@@ -158,29 +154,24 @@ class Usuario:
                     progresso.adicionar_pontos(pontos)
                 return progresso
         raise ValueError("Progresso não encontrado")
-    
-
-# Rank
 
 
 class Rank:
     def __init__(self, usuarios, usuario_atual):
-        self.usuarios = usuarios  # Lista de objetos da classe Usuario
-        self.usuario_atual = usuario_atual  # Objeto Usuario do usuário que está vendo
-        self.ranking = []  # Lista para armazenar pares [pontuacao, usuario]
+        self.usuarios = usuarios
+        self.usuario_atual = usuario_atual
+        self.ranking = []
 
     def insertion_sort(self):
-        # Copia os dados para ranking como pares [pontuacao, usuario]
         self.ranking = []
         for u in self.usuarios:
             pontos = u._Usuario__carteira.pontos if u._Usuario__carteira is not None else 0
             self.ranking.append([pontos, u])
 
-        # Algoritmo Insertion Sort
         for i in range(1, len(self.ranking)):
             chave = self.ranking[i]
             j = i - 1
-            while j >= 0 and self.ranking[j][0] < chave[0]:  # Ordem decrescente
+            while j >= 0 and self.ranking[j][0] < chave[0]:
                 self.ranking[j + 1] = self.ranking[j]
                 j -= 1
             self.ranking[j + 1] = chave
@@ -194,56 +185,44 @@ class Rank:
 
     def exibir_rank_usuario(self):
         self.insertion_sort()
-
-        # Encontra a posição do usuário atual
         posicao_atual = -1
         for i, (_, usuario) in enumerate(self.ranking):
             if usuario == self.usuario_atual:
                 posicao_atual = i + 1
                 break
-
-        # Se o usuário não está no top 10, mostra sua posição
         if posicao_atual > 10 and posicao_atual <= len(self.ranking):
             print("...")
             pontuacao, usuario = self.ranking[posicao_atual - 1]
             print(f"{posicao_atual}º - {usuario.nome}: {pontuacao} pontos")
 
+
 class Gamificacao:
     def __init__(self, id_gamificacao: int, id_usuario: int, tipo: str, valor: int):
         self.id_gamificacao = id_gamificacao
         self.id_usuario = id_usuario
-        self.tipo = self.validar_tipo(tipo)  # Tipo de gamificação (ex.: "desafio", "missão", "conquista")
-        self.valor = self.validar_valor(valor)  # Valor em pontos/moedas associado à gamificação
+        self.tipo = self.validar_tipo(tipo)
+        self.valor = self.validar_valor(valor)
 
     def validar_tipo(self, tipo: str) -> str:
-        """Valida se o tipo de gamificação é uma string não vazia."""
         if not isinstance(tipo, str) or tipo.strip() == "":
             raise ValueError("O tipo de gamificação deve ser uma string não vazia.")
         return tipo.strip().lower()
 
     def validar_valor(self, valor: int) -> int:
-        """Valida se o valor é um inteiro positivo."""
         if not isinstance(valor, int) or valor < 0:
             raise ValueError("O valor deve ser um inteiro positivo.")
         return valor
 
     def aplicar_gamificacao(self, usuario: 'Usuario') -> str:
-        """
-        Aplica a gamificação ao usuário, adicionando o valor à carteira virtual.
-        Retorna uma mensagem de sucesso ou erro.
-        """
-        if self.id_usuario != id(usuario):  # Supondo que o usuário tenha um método ou atributo id
+        if self.id_usuario != usuario.id:
             return "Erro: ID do usuário não corresponde ao ID da gamificação."
-        
         resultado = usuario.adicionar_moedas(self.valor)
         return f"Gamificação '{self.tipo}' aplicada! {resultado}"
 
     def to_dict(self) -> dict:
-        """Converte a gamificação em um dicionário para serialização."""
         return {
             "id_gamificacao": self.id_gamificacao,
             "id_usuario": self.id_usuario,
             "tipo": self.tipo,
             "valor": self.valor
         }
-    
