@@ -288,14 +288,28 @@ function startCotaUpdate() {
 }
 
 function drawChart() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (!canvas || !ctx) return;
+
+    // Get device pixel ratio for high-DPI displays
+    const dpr = window.devicePixelRatio || 1;
+
+    // Set canvas size based on CSS size and DPR
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+
+    // Scale the context to match DPR
+    ctx.scale(dpr, dpr);
+
+    // Clear the canvas
+    ctx.clearRect(0, 0, rect.width, rect.height);
     ctx.fillStyle = '#1a1a1a';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, 0, rect.width, rect.height);
 
     const leftPadding = 50;
     const padding = 20;
     const maxEntries = 30;
-    const barWidth = (canvas.width - leftPadding - padding) / maxEntries;
+    const barWidth = (rect.width - leftPadding - padding) / maxEntries;
 
     const displayedData = state.price_history.slice(-maxEntries);
     if (displayedData.length === 0) return;
@@ -305,15 +319,16 @@ function drawChart() {
     const maxPrice = Math.max(...displayedData.map(d => Math.max(d.o, d.c)));
     const minPrice = Math.min(...displayedData.map(d => Math.min(d.o, d.c)));
     const priceRange = maxPrice - minPrice || 1;
-    const heightScale = (canvas.height - 2 * padding) / priceRange;
+    const heightScale = (rect.height - 2 * padding) / priceRange;
 
+    // Draw grid lines
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
     ctx.lineWidth = 0.5;
     for (let i = 0; i <= 5; i++) {
-        const y = canvas.height - padding - (i * priceRange / 5) * heightScale;
+        const y = rect.height - padding - (i * priceRange / 5) * heightScale;
         ctx.beginPath();
         ctx.moveTo(leftPadding, y);
-        ctx.lineTo(canvas.width - padding, y);
+        ctx.lineTo(rect.width - padding, y);
         ctx.stroke();
         ctx.fillStyle = 'white';
         ctx.font = '10px Arial';
@@ -321,10 +336,11 @@ function drawChart() {
         ctx.fillText(Math.round(minPrice + (i * priceRange / 5)).toFixed(2), leftPadding - 5, y + 4);
     }
 
+    // Draw candlesticks
     displayedData.forEach((data, index) => {
         const x = leftPadding + (displayedData.length - 1 - index) * barWidth;
-        const openY = canvas.height - padding - (data.o - minPrice) * heightScale;
-        const closeY = canvas.height - padding - (data.c - minPrice) * heightScale;
+        const openY = rect.height - padding - (data.o - minPrice) * heightScale;
+        const closeY = rect.height - padding - (data.c - minPrice) * heightScale;
         const height = Math.abs(openY - closeY);
 
         ctx.fillStyle = data.c >= data.o ? 'rgba(0, 255, 0, 0.7)' : 'rgba(255, 0, 0, 0.7)';
