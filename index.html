@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="refresh" content="3;url=https://monedu.onrender.com">
+    <title>Redirecionando...</title>
+    <style>
+        :root {
+            --azul: rgb(0, 87, 183);
+            --azulescuro: rgb(0, 0, 255);
+            --azulclaro: rgb(0, 81, 255);
+            --laranja: rgb(245, 124, 0);
+            --laranjaclaro: rgb(255, 119, 0);
+            --laranjaforte: rgb(235, 74, 0);
+        }
+
+        body {
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: var(--azul);
+            font-family: Arial, sans-serif;
+        }
+
+        .loader-container {
+            text-align: center;
+            color: var(--laranjaclaro);
+        }
+
+        .loader {
+            width: 60px;
+            height: 60px;
+            border: 8px solid var(--azulclaro);
+            border-top: 8px solid var(--laranjaforte);
+            border-radius: 50%;
+            animation: spin 1.5s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        p {
+            font-size: 1.2em;
+            color: var(--laranjaclaro);
+        }
+
+        a {
+            color: var(--laranja);
+            text-decoration: none;
+            transition: color 0.3s;
+        }
+
+        a:hover {
+            color: var(--laranjaforte);
+        }
+    </style>
+</head>
+<body>
+    <div class="loader-container">
+        <div class="loader"></div>
+        <p>Redirecionando para <a href="https://monedu.onrender.com">monedu.onrender.com</a>...</p>
+    </div>
+    <script>
+        window.location.href = "https://monedu.onrender.com";
+    </script>
+</body>
+</html>
